@@ -166,13 +166,27 @@ def resolve_dataset_roots(dataset: str, kaggle_slugs: dict[str, str],
     """
     if dataset not in kaggle_slugs:
         raise KeyError(f"no kaggle slug configured for dataset '{dataset}'")
-    root = data_dir(kaggle_slugs[dataset])
+    slug = kaggle_slugs[dataset]
+    root = data_dir(slug)
     if not root.exists():
-        raise FileNotFoundError(
-            f"dataset '{dataset}' not found at {root}. "
-            f"On Kaggle, attach '{kaggle_slugs[dataset]}' to the notebook. "
-            f"Locally, download it into {root}."
-        )
+        # Kaggle occasionally mounts a dataset under a differently-cased name than
+        # the slug tail. That is safe to accept — an exact case-insensitive match is
+        # still the same dataset. Anything looser would risk training on the wrong
+        # data silently, so it stays an error.
+        base = root.parent
+        siblings = sorted(d.name for d in base.iterdir() if d.is_dir()) \
+            if base.exists() else []
+        match = next((n for n in siblings if n.casefold() == root.name.casefold()), None)
+        if match is not None:
+            root = base / match
+        else:
+            raise FileNotFoundError(
+                f"dataset '{dataset}' not found at {root}. "
+                f"On Kaggle, attach '{slug}' to the notebook (Add Input -> Datasets); "
+                f"note that editing kernel-metadata.json does not change a session "
+                f"that is already running. Locally, download it into {root}. "
+                f"Present in {base}: {siblings or '(nothing)'}"
+            )
     return _descend_to_class_dirs(root, variant)
 
 
