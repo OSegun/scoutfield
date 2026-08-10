@@ -1,0 +1,66 @@
+# PPO on the scaled field.
+#
+# Why 32x32 and this budget: the pilot ran 12x12 with BUDGET=190, which permitted
+# near-total coverage. With nothing to leave unvisited, adaptive planning had no
+# selectivity to exploit and lost to a fixed lawnmower sweep at every temperature.
+# The budget below is set so reachable coverage is capped near 40%, which is the
+# regime where informative path planning can actually pay for itself.
+# Verify the coverage ceiling empirically before trusting any result from this file.
+
+seed: 0
+
+env:
+  grid: 32
+  # 640 / (E_HOVER + E_TRANSLATE) = 400 steps over 1024 cells -> ceiling 0.391.
+  # That bound is optimistic: it assumes every step is a unit move to an unvisited
+  # cell. Diagonal moves cost translate*sqrt(2) and revisits are unavoidable, so
+  # measured coverage will be lower. Verify it empirically before trusting a result.
+  budget: 640.0
+  prior: 0.15
+  patch: 5
+  detect_threshold: 0.75  # tau — swept separately by experiments/tau_sensitivity.py
+  cluster_sigma: 1.5
+  # The Neyman-Scott parameters generate an absolute COUNT of diseased cells, not a
+  # density, so inheriting the pilot's n_parents=3 at 32x32 would drop prevalence
+  # from 0.170 to 0.030 — a 5.7x change arriving silently alongside the scale change.
+  # That confounds the comparison: the scale change is meant to constrain coverage
+  # and nothing else. Measured over 30 seeds, n_parents=18 reproduces the pilot's
+  # prevalence (0.1700 vs 0.1697). Note 18, not the 21 that naive area scaling
+  # (1024/144 = 7.1x) would suggest — clusters overlap more at higher density, so
+  # the value is measured rather than derived.
+  n_parents: 18
+  offspring_mean: 14
+  # Reward weights inherited from the pilot. Freeze these early: reward shaping is
+  # the identified risk most likely to consume weeks.
+  alpha: 1.0
+  lam: 6.0
+  mu: 0.15
+  energy:
+    hover: 1.0
+    translate: 0.6
+  observation:
+    # The pilot's agent saw only a 5x5 local patch, which is one of the three named
+    # causes of its underperformance. A downsampled global belief map is added here.
+    local_patch: true
+    global_belief_map: true
+    global_map_size: 8    # 32x32 belief downsampled to 8x8
+
+ppo:
+  total_timesteps: 2_000_000
+  n_envs: 8
+  n_steps: 512
+  batch_size: 512
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  learning_rate: 3.0e-4
+  policy: MlpPolicy
+  net_arch: [256, 256]
+  checkpoint_dir: checkpoints/ppo
+  checkpoint_freq: 50_000
+  eval_episodes: 20
+  eval_seeds: [0, 1, 2, 3, 4]

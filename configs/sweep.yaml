@@ -1,0 +1,35 @@
+# Evaluation sweep. Mirrors the pilot's design so the two are directly comparable.
+#
+# Statistics follow Agarwal et al. (2021) and Colas et al. (2018, 2019):
+# interquartile mean with stratified bootstrap confidence intervals, never
+# mean +/- std over three seeds.
+
+seed: 0
+
+# The pilot ships no Spiral agent despite earlier drafts naming one; its
+# non-learned baselines are Lawnmower, Random and GreedyEntropy.
+agents: [lawnmower, random, greedy_entropy, ppo, oracle]
+
+temperatures: [0.30, 0.50, 1.00, 2.00, 3.00, 4.00]
+seeds: [0, 1, 2, 3, 4]
+cluster_sigmas: [0.75, 1.50, 3.00]
+
+# Held at the pilot's prevalence — see the note in configs/ppo_field32.yaml.
+n_parents: 18
+offspring_mean: 14
+
+eval_episodes: 20
+
+statistics:
+  estimator: iqm
+  bootstrap_resamples: 10000
+  ci: 0.95
+  stratify_by: [agent, temperature]
+
+# Resumable, like the pilot's run_jobs.py. Delete results/_done.json to restart
+# cleanly — otherwise the driver resumes and silently mixes old and new results.
+runner:
+  checkpoint_file: results/_done.json
+  output_csv: results/sweep_results.csv
+  summary_json: results/summary.json
+  job_budget: 60          # jobs per process invocation; keeps Kaggle sessions short

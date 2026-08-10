@@ -1,0 +1,17 @@
+{
+  "id": "osegun/scoutfield-01-perception-finetune",
+  "title": "scoutfield 01 Perception Finetune",
+  "code_file": "01_perception_finetune.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "false",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [
+    "abdallahalidev/plantvillage-dataset"
+  ],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}

@@ -1,0 +1,57 @@
+cff-version: 1.2.0
+message: >-
+  This repository is the implementation phase and has produced no results yet.
+  Please cite the pilot study, listed under references, for any measured number.
+title: "scoutfield: calibration-aware informative path planning for energy-constrained aerial crop scouting"
+abstract: >-
+  Informative path planning assumes the information signal it consumes is calibrated.
+  Deep classifiers are systematically miscalibrated and degrade further under
+  distribution shift. This repository couples a fine-tuned crop-disease classifier's
+  calibrated uncertainty to a reinforcement learning path planner under an energy
+  budget, and measures how calibration error propagates into planner performance.
+  Temperature scaling holds accuracy fixed while confidence varies, isolating
+  calibration as the independent variable.
+authors:
+  - family-names: Odusina
+    given-names: Oluwasegun Ibrahim
+    orcid: ""
+version: 0.1.0.dev0
+license: MIT
+repository-code: "https://github.com/OSegun/scoutfield"
+keywords:
+  - reinforcement learning
+  - informative path planning
+  - uncertainty calibration
+  - computer vision
+  - precision agriculture
+
+# The prior work this phase builds on. Until this repository produces results of its
+# own, this is what should be cited.
+preferred-citation:
+  type: thesis
+  title: >-
+    Development and Evaluation of a Calibration-Aware REINFORCE Agent for
+    Energy-Efficient Aerial Agricultural Surveillance
+  authors:
+    - family-names: Odusina
+      given-names: Oluwasegun Ibrahim
+  year: 2026
+  institution:
+    name: Miva Open University
+  thesis-type: Seminar paper
+  # TODO: add the paper URL or DOI once it is published.
+  url: ""
+
+references:
+  - type: software
+    title: "ScoutPlan: calibration-aware active sensing for energy-constrained aerial crop scouting"
+    authors:
+      - family-names: Odusina
+        given-names: Oluwasegun Ibrahim
+    version: v1.0.0
+    year: 2026
+    repository-code: "https://github.com/OSegun/scoutplan"
+    notes: >-
+      Pilot study and reproduction package for the paper above. 195 executed runs
+      establishing that calibration error at fixed accuracy changes planner
+      performance. Pinned as a dependency of this repository.

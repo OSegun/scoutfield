@@ -1,0 +1,16 @@
+# Installed inside a Kaggle notebook. Kaggle already ships torch, torchvision, numpy,
+# pandas, matplotlib, scikit-learn and pillow — reinstalling them wastes minutes of a
+# limited GPU quota and risks a CUDA/driver mismatch.
+#
+# Requires "Internet: on" in the notebook's settings panel.
+#
+# The pilot is pinned to an immutable tag so the published baseline cannot drift.
+# This repo is pinned to `main` instead, because it is under active development and a
+# notebook should pick up the newest code — but that also means a notebook run is only
+# reproducible together with the commit `main` pointed at, which each run prints.
+scoutplan  @ git+https://github.com/OSegun/scoutplan.git@v1.0.0
+scoutfield @ git+https://github.com/OSegun/scoutfield.git@main
+
+gymnasium>=0.29
+stable-baselines3>=2.3
+pyyaml>=6.0

@@ -1,0 +1,50 @@
+# ---------------------------------------------------------------- Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+
+# ------------------------------------------------- generated, never commit
+# Rule: if a script wrote it, git does not track it. Fix the code or the
+# data and re-run rather than hand-editing an artefact.
+results/**
+!results/.gitkeep
+figures/**
+!figures/.gitkeep
+checkpoints/**
+!checkpoints/.gitkeep
+runs/
+wandb/
+tensorboard/
+
+# ------------------------------------------------------ data and weights
+# PlantVillage / PlantDoc are pulled at run time, never vendored.
+data/
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.npz
+*.h5
+
+# ------------------------------------------------- local-only, not published
+# This repo is public. A file whose *name* is an assistant's name is tool
+# attribution on an academic artefact, which the project's rules forbid. The
+# contract it holds is still read locally by the developer agent; it just never
+# leaves this machine. Remove this line if you decide otherwise.
+CLAUDE.md
+
+# -------------------------------------------------------------- tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+kaggle.json
+.DS_Store

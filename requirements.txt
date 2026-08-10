@@ -1,0 +1,27 @@
+# Local development (CPU laptop, VS Code).
+# Kaggle uses requirements-kaggle.txt, which omits what Kaggle already ships.
+#
+# The pilot is pinned to an immutable tag, not a branch: the baseline this work is
+# measured against must not be able to drift. v1.0.0 resolves to commit df6644a8.
+scoutplan @ git+https://github.com/OSegun/scoutplan.git@v1.0.0
+
+numpy>=1.24
+pyyaml>=6.0
+
+# perception
+torch>=2.2
+torchvision>=0.17
+pillow>=10.0
+scikit-learn>=1.3
+
+# planning
+gymnasium>=0.29
+stable-baselines3>=2.3
+
+# figures and analysis
+matplotlib>=3.7
+pandas>=2.0
+
+# dev
+pytest>=8.0
+ruff>=0.5

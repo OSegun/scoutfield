@@ -1,0 +1,65 @@
+# Perception: fine-tuning and calibration.
+# Every value here is read by code. Nothing is duplicated in a .py file.
+
+seed: 0
+
+data:
+  # PlantVillage is lab-condition imagery and trains the model.
+  # PlantDoc is field imagery and is the held-out distribution-shift test.
+  # Never train on PlantDoc — the shift test is the point.
+  train_dataset: plantvillage
+  shift_dataset: plantdoc
+  # Kaggle dataset slugs; resolved by utils/paths.py when running on Kaggle.
+  kaggle_slugs:
+    plantvillage: abdallahalidev/plantvillage-dataset
+    plantdoc: nirmalsankalana/plantdoc-dataset
+  image_size: 224
+  # PlantVillage ships three renderings of the same photographs side by side:
+  # color, grayscale and segmented. Exactly one is used. `color` is the only one
+  # matching the RGB field imagery in PlantDoc and the only one consistent with an
+  # ImageNet-pretrained backbone; `segmented` removes the background, which is the
+  # very cue that fails under shift, so training on it would flatter the model.
+  plantvillage_variant: color
+  # Binary healthy/diseased, matching the pilot's ScoutEnv label space.
+  # PlantDoc names no class "healthy", so the mapping is enumerated explicitly in
+  # scoutfield/perception/datasets.py rather than inferred from the directory name.
+  binarise: true
+  # Two held-out splits from PlantVillage, deliberately separate: `val` fits the
+  # temperature (Guo et al., 2017) and `test` carries early stopping and
+  # in-distribution reporting. Using one split for both leaks the calibration fit
+  # into the stopping decision.
+  val_fraction: 0.15
+  test_fraction: 0.15
+  num_workers: 2
+
+model:
+  backbone: efficientnet_b0
+  pretrained: true
+  # Dropout is kept active at inference for MC-dropout uncertainty (roadmap item 7),
+  # so it must be a real layer in the head, not a functional call.
+  head_dropout: 0.3
+  freeze_backbone_epochs: 1
+
+train:
+  epochs: 12
+  batch_size: 64
+  optimizer: adamw
+  lr: 3.0e-4
+  backbone_lr: 3.0e-5
+  weight_decay: 1.0e-4
+  scheduler: cosine
+  label_smoothing: 0.0    # keep at 0: it changes calibration, which is the dependent variable
+  amp: true
+  # Kaggle kills sessions. Checkpoint every epoch and resume from the last one.
+  checkpoint_every_epoch: true
+  checkpoint_dir: checkpoints/perception
+
+calibration:
+  # Fitted on the validation split by minimising NLL, per Guo et al. (2017).
+  fit_temperature_on: val
+  # Swept afterwards to reproduce the pilot's instrument on a real classifier.
+  # Accuracy MUST be invariant across this sweep to 4 d.p.
+  temperature_sweep: [0.30, 0.50, 1.00, 2.00, 3.00, 4.00]
+  ece_bins: 15
+  mc_dropout_samples: 30
+  ensemble_members: 5

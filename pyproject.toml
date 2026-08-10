@@ -1,0 +1,56 @@
+[project]
+name = "scoutfield"
+version = "0.1.0.dev0"
+description = "Calibration-aware informative path planning for energy-constrained aerial crop scouting: a real classifier and a PPO planner replacing the pilot's surrogate instrument"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Oluwasegun Odusina" }]
+keywords = [
+    "reinforcement-learning", "informative-path-planning", "calibration",
+    "uncertainty-quantification", "computer-vision", "precision-agriculture",
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# The pilot is a dependency, not a fork. Pinned to an immutable tag that produced the
+# published numbers, so this repo can never silently change the baseline it is measured
+# against. v1.0.0 resolves to commit df6644a8.
+dependencies = [
+    "scoutplan @ git+https://github.com/OSegun/scoutplan.git@v1.0.0",
+    "numpy>=1.24",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+perception = ["torch>=2.2", "torchvision>=0.17", "pillow>=10.0", "scikit-learn>=1.3"]
+planning   = ["gymnasium>=0.29", "stable-baselines3>=2.3"]
+# onnxscript is required by torch>=2.6's ONNX exporter, not by us directly.
+app        = ["onnx>=1.16", "onnxruntime>=1.18", "onnxscript>=0.1", "streamlit>=1.35"]
+figures    = ["matplotlib>=3.7", "pandas>=2.0"]
+dev        = ["pytest>=8.0", "ruff>=0.5"]
+
+[project.urls]
+Homepage = "https://github.com/OSegun/scoutfield"
+"Pilot study" = "https://github.com/OSegun/scoutplan"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+# The library only. `experiments/` holds runnable drivers and is deliberately not
+# packaged: it is not part of the importable surface.
+[tool.setuptools.packages.find]
+include = ["scoutfield*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

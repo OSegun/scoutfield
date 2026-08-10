@@ -1,0 +1,15 @@
+{
+  "id": "osegun/scoutfield-04-evaluation-sweep",
+  "title": "scoutfield 04 Evaluation Sweep",
+  "code_file": "04_evaluation_sweep.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "false",
+  "enable_gpu": "false",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [],
+  "model_sources": []
+}
