@@ -1,15 +1,19 @@
-# Installed inside a Kaggle notebook. Kaggle already ships torch, torchvision, numpy,
-# pandas, matplotlib, scikit-learn and pillow — reinstalling them wastes minutes of a
-# limited GPU quota and risks a CUDA/driver mismatch.
+# Installed inside a Kaggle notebook, from the CLONED copy of this repo — the bootstrap
+# cell clones first and then runs `pip install -r requirements-kaggle.txt` against this
+# file on disk. Nothing therefore depends on raw.githubusercontent.com being reachable.
+#
+# Kaggle already ships torch, torchvision, numpy, pandas, matplotlib, scikit-learn and
+# pillow. Reinstalling them wastes minutes of a limited GPU quota and risks a CUDA/driver
+# mismatch, so they are deliberately absent here.
+#
+# `scoutfield` itself is NOT listed: the bootstrap installs the clone with
+# `pip install -e . --no-deps`, so the code that runs is the code that was cloned, and
+# there is never a second copy in site-packages to disagree with it.
 #
 # Requires "Internet: on" in the notebook's settings panel.
-#
-# The pilot is pinned to an immutable tag so the published baseline cannot drift.
-# This repo is pinned to `main` instead, because it is under active development and a
-# notebook should pick up the newest code — but that also means a notebook run is only
-# reproducible together with the commit `main` pointed at, which each run prints.
-scoutplan  @ git+https://github.com/OSegun/scoutplan.git@v1.0.0
-scoutfield @ git+https://github.com/OSegun/scoutfield.git@main
+
+# The pilot, pinned to an immutable tag so the published baseline cannot drift.
+scoutplan @ git+https://github.com/OSegun/scoutplan.git@v1.0.0
 
 gymnasium>=0.29
 stable-baselines3>=2.3

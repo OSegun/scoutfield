@@ -1,13 +1,26 @@
 """
-Generate the notebook skeletons.
+Generate the notebooks and their Kaggle metadata.
 
-Run once after cloning, or after changing the bootstrap cell:
-
-    python scripts/make_notebooks.py          # only creates what is missing
-    python scripts/make_notebooks.py --force  # rebuild all
+    python scripts/make_notebooks.py          # only creates missing notebooks
+    python scripts/make_notebooks.py --force  # rebuild every notebook too
+    python scripts/make_notebooks.py --user someone-else   # one-off username override
 
 Each notebook gets the shared bootstrap cell and a call into an ``experiments/`` script.
 Logic lives in the package; a notebook that contains a training loop is a bug.
+
+One source, four files
+----------------------
+The Kaggle API requires **one ``kernel-metadata.json`` per kernel directory** — each
+declares its own ``id``, ``code_file``, accelerator and attached datasets, and
+``kaggle kernels push -p <dir>`` reads exactly one of them. Four kernels therefore mean
+four files, and that is not negotiable.
+
+What *is* negotiable is whether they are maintained in four places. They are not: all
+four are generated here, from ``configs/kaggle.yaml`` (who is running this) and
+``configs/perception.yaml`` (which datasets, shared with the training code so a slug is
+never written twice). Metadata is rewritten on every run, without ``--force``, precisely
+so that "change it in one place" stays true — a hand-edit in a generated file would be
+silently reverted, which is the intended behaviour.
 """
 
 from __future__ import annotations
@@ -17,18 +30,35 @@ import json
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "notebooks"))
-from _bootstrap import BOOTSTRAP_CELL  # noqa: E402
+from _bootstrap import render_bootstrap  # noqa: E402
 
-KAGGLE_USER = "osegun"  # change if your Kaggle username differs
+
+def load_settings(user_override: str | None = None) -> dict:
+    """Read the two config files that between them describe every generated value."""
+    kaggle = yaml.safe_load((ROOT / "configs" / "kaggle.yaml").read_text(encoding="utf-8"))
+    perception = yaml.safe_load(
+        (ROOT / "configs" / "perception.yaml").read_text(encoding="utf-8")
+    )
+    return {
+        "user": user_override or kaggle["username"],
+        "repo": kaggle["repo"],
+        "branch": kaggle["branch"],
+        # Resolved from the training config, so the slugs cannot drift apart.
+        "slugs": perception["data"]["kaggle_slugs"],
+    }
+
 
 NOTEBOOKS = [
     {
         "dir": "01_perception_finetune",
         "title": "scoutfield 01 Perception Finetune",
         "gpu": True,
-        "datasets": ["abdallahalidev/plantvillage-dataset"],
+        # Keys into `data.kaggle_slugs` in configs/perception.yaml, not slugs.
+        "datasets": ["plantvillage"],
         "purpose": (
             "Fine-tune EfficientNet-B0 on PlantVillage.\n\n"
             "Roadmap item 1. Produces a checkpoint and `results/perception_summary.json`, "
@@ -48,10 +78,7 @@ NOTEBOOKS = [
         "dir": "02_calibration_shift",
         "title": "scoutfield 02 Calibration And Shift",
         "gpu": True,
-        "datasets": [
-            "abdallahalidev/plantvillage-dataset",
-            "nirmalsankalana/plantdoc-dataset",
-        ],
+        "datasets": ["plantvillage", "plantdoc"],
         "purpose": (
             "Fit the temperature on validation, sweep it, and evaluate the distribution "
             "shift on PlantDoc.\n\n"
@@ -125,12 +152,12 @@ def code(text: str) -> dict:
     }
 
 
-def build_notebook(spec: dict) -> dict:
+def build_notebook(spec: dict, settings: dict) -> dict:
     cells = [
         md(f"# {spec['title']}\n\n{spec['purpose']}\n\n"
            "> Logic lives in `scoutfield/` and `experiments/`. This notebook orchestrates: "
            "install, configure, call, display.\n"),
-        code(BOOTSTRAP_CELL.strip()),
+        code(render_bootstrap(settings["repo"], settings["branch"]).strip()),
         md("## Run\n"),
         code("\n".join(spec["calls"])),
     ]
@@ -145,10 +172,17 @@ def build_notebook(spec: dict) -> dict:
     }
 
 
-def build_metadata(spec: dict) -> dict:
+def build_metadata(spec: dict, settings: dict) -> dict:
     slug = "scoutfield-" + spec["dir"].replace("_", "-")
+    slugs = settings["slugs"]
+    unknown = [k for k in spec["datasets"] if k not in slugs]
+    if unknown:
+        raise KeyError(
+            f"notebook '{spec['dir']}' asks for dataset key(s) {unknown}, which are not in "
+            f"configs/perception.yaml under data.kaggle_slugs (have: {sorted(slugs)})"
+        )
     return {
-        "id": f"{KAGGLE_USER}/{slug}",
+        "id": f"{settings['user']}/{slug}",
         "title": spec["title"],
         "code_file": f"{spec['dir']}.ipynb",
         "language": "python",
@@ -156,9 +190,9 @@ def build_metadata(spec: dict) -> dict:
         "is_private": "false",
         "enable_gpu": "true" if spec["gpu"] else "false",
         "enable_tpu": "false",
-        # Internet must be on: pip install git+... fails without it.
+        # Internet must be on: the clone and pip install both fail without it.
         "enable_internet": "true",
-        "dataset_sources": spec["datasets"],
+        "dataset_sources": [slugs[k] for k in spec["datasets"]],
         "competition_sources": [],
         "kernel_sources": [],
         "model_sources": [],
@@ -168,7 +202,12 @@ def build_metadata(spec: dict) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--force", action="store_true", help="overwrite existing notebooks")
+    parser.add_argument("--user", default=None,
+                        help="override configs/kaggle.yaml username for this run")
     args = parser.parse_args()
+
+    settings = load_settings(args.user)
+    print(f"user={settings['user']} repo={settings['repo']}@{settings['branch']}")
 
     for spec in NOTEBOOKS:
         d = ROOT / "notebooks" / spec["dir"]
@@ -176,13 +215,17 @@ def main() -> None:
 
         nb_path = d / f"{spec['dir']}.ipynb"
         if args.force or not nb_path.exists():
-            nb_path.write_text(json.dumps(build_notebook(spec), indent=1), encoding="utf-8")
+            nb_path.write_text(json.dumps(build_notebook(spec, settings), indent=1),
+                               encoding="utf-8")
             print("wrote", nb_path.relative_to(ROOT))
 
+        # Always rewritten, --force or not. Metadata is wholly derived from the two
+        # config files, so regenerating it unconditionally is what makes "change the
+        # username in one place" actually true. A hand-edit here is meant to be lost.
         meta_path = d / "kernel-metadata.json"
-        if args.force or not meta_path.exists():
-            meta_path.write_text(json.dumps(build_metadata(spec), indent=2), encoding="utf-8")
-            print("wrote", meta_path.relative_to(ROOT))
+        meta_path.write_text(json.dumps(build_metadata(spec, settings), indent=2) + "\n",
+                             encoding="utf-8")
+        print("wrote", meta_path.relative_to(ROOT))
 
 
 if __name__ == "__main__":

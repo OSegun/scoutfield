@@ -200,9 +200,19 @@ Everything runs on free-tier Kaggle. No budget, no paid data, no purchased hardw
 Kaggle supplies the GPU and nothing else — the code lives here and is installed into the
 notebook, never pasted into it. A notebook that contains logic is a bug.
 
+Each notebook's first cell clones this repository and installs from the clone. Cloning
+rather than only pip-installing is deliberate: `experiments/` and `configs/` are not
+packaged, so a pip install alone would leave the drivers and the YAML configs missing.
+
 ```python
-!pip install -q -r https://raw.githubusercontent.com/OSegun/scoutfield/main/requirements-kaggle.txt
+subprocess.run(["git", "clone", "--depth", "1", REPO, "/kaggle/working/scoutfield"])
+# then, from inside the clone:
+#   pip install -r requirements-kaggle.txt
+#   pip install -e . --no-deps
 ```
+
+The cell is generated, not hand-written — see `notebooks/_bootstrap.py` and
+`configs/kaggle.yaml`.
 
 Internet **on**, accelerator **GPU**, persistence **variables and files**. Sessions are
 killed at nine hours and much sooner when idle, so every long job checkpoints per epoch or

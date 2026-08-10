@@ -148,11 +148,15 @@ make notebooks-push
 make notebooks-pull
 ```
 
-Each notebook installs this repo rather than containing logic:
+Each notebook clones and installs this repo rather than containing logic. It clones
+because `experiments/` and `configs/` are not packaged, so a pip install alone leaves the
+drivers and the configs absent; it installs *from the clone* so that nothing depends on
+`raw.githubusercontent.com` and no second copy of the package can shadow the cloned one.
+The cell is generated from `configs/kaggle.yaml` — change a username or a fork there and
+run `python scripts/make_notebooks.py --force`.
 
-```python
-!pip install -q -r https://raw.githubusercontent.com/OSegun/scoutfield/main/requirements-kaggle.txt
-```
+Every run prints the commit it cloned. Quote that commit beside any number the run
+produced: the notebooks track `main`, and `main` moves.
 
 Internet **on**, accelerator **GPU**, persistence **variables and files**. Only
 `/kaggle/working` survives to the notebook output; anything written elsewhere is lost when

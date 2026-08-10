@@ -13,6 +13,13 @@ that loop belongs in a module.
 Each notebook is a directory containing the `.ipynb` and a `kernel-metadata.json`
 that the Kaggle API uses to push and pull it.
 
+**Both files in every directory are generated.** `kernel-metadata.json` is rewritten on
+every run of `scripts/make_notebooks.py`, from `configs/kaggle.yaml` (username, fork,
+branch) and `configs/perception.yaml` (dataset slugs, shared with the training code).
+Kaggle requires one metadata file per kernel — each carries its own id, code file,
+accelerator and attached datasets — but they are maintained in one place, not four. Edit
+a config and re-run the script; hand-edits here are meant to be lost.
+
 ```
 notebooks/
 ├── _bootstrap.py                first cell of every notebook, kept in one place
@@ -59,8 +66,14 @@ Every long job checkpoints per epoch or per sweep job via
 chunks so a kill costs one chunk:
 
 ```python
-!while JOB_BUDGET=60 python -m scoutfield.experiments.sweep; do :; done
+!while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done
 ```
+
+Note that persistence covers the *interactive* session. A committed run
+(**Save Version → Save & Run All**) starts in a clean container and keeps only what it
+writes to `/kaggle/working` during that run, so resume state has to be fed back in as an
+attached input or a Dataset. Verify that on your first pair of commits rather than
+assuming it.
 
 ## GPU quota
 
