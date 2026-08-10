@@ -38,9 +38,20 @@ REPO = "https://github.com/{repo}.git"
 BRANCH = "{branch}"
 SRC = "/kaggle/working/scoutfield"
 
+# Cloned if absent, fast-forwarded if present. The second half is not optional:
+# /kaggle/working persists between sessions when persistence is on, so a
+# clone-if-missing alone pins the session to whatever commit was first cloned and
+# every later push is silently ignored — the run then reports a stale commit while
+# appearing to work. Local edits inside the clone are discarded, deliberately; the
+# checkout is disposable and the repository is the record.
 if not os.path.isdir(os.path.join(SRC, ".git")):
     subprocess.run(["git", "clone", "--depth", "1", "--branch", BRANCH, REPO, SRC],
                    check=True)
+else:
+    subprocess.run(["git", "-C", SRC, "fetch", "--depth", "1", "origin", BRANCH],
+                   check=True)
+    subprocess.run(["git", "-C", SRC, "reset", "--hard", f"origin/{{BRANCH}}"], check=True)
+    subprocess.run(["git", "-C", SRC, "clean", "-fd"], check=True)
 os.chdir(SRC)
 
 # Printed, not assumed: `main` moves, so the commit is the only honest record of what

@@ -258,13 +258,16 @@ def run(config, checkpoint=None) -> dict:
     """
     from scoutfield.perception.datasets import build_dataloaders
     from scoutfield.perception.model import build_model
-    from scoutfield.utils.paths import checkpoints_dir, results_dir
+    from scoutfield.utils.paths import find_checkpoint, results_dir
 
     cal_cfg = config.section("calibration")
     bins = int(cal_cfg.get("ece_bins", 15))
     temperatures = [float(t) for t in cal_cfg["temperature_sweep"]]
 
-    checkpoint = checkpoint or (checkpoints_dir("perception") / "best.pt")
+    # Not `checkpoints_dir(...)`: this notebook consumes what notebook 01 wrote, and
+    # on Kaggle that arrives read-only under /kaggle/input, not in this session's
+    # writable directory. See `find_checkpoint`.
+    checkpoint = checkpoint or find_checkpoint("perception", "best.pt")
     model = build_model(config)
     model.load_state_dict(_load_model_state(checkpoint))
 

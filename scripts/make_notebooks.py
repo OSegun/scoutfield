@@ -79,6 +79,8 @@ NOTEBOOKS = [
         "title": "scoutfield 02 Calibration And Shift",
         "gpu": True,
         "datasets": ["plantvillage", "plantdoc"],
+        # Consumes checkpoints/perception/best.pt from notebook 01.
+        "needs": ["01_perception_finetune"],
         "purpose": (
             "Fit the temperature on validation, sweep it, and evaluate the distribution "
             "shift on PlantDoc.\n\n"
@@ -101,6 +103,8 @@ NOTEBOOKS = [
         "title": "scoutfield 03 PPO Training",
         "gpu": True,
         "datasets": [],
+        # The planner observes through the fine-tuned classifier.
+        "needs": ["01_perception_finetune"],
         "purpose": (
             "Train PPO on the 32x32 field with the global belief map.\n\n"
             "Roadmap items 4 and 5. The script verifies the coverage ceiling before "
@@ -120,6 +124,8 @@ NOTEBOOKS = [
         "title": "scoutfield 04 Evaluation Sweep",
         "gpu": False,
         "datasets": [],
+        # Evaluates the trained PPO policies against the same classifier.
+        "needs": ["01_perception_finetune", "03_ppo_training"],
         "purpose": (
             "Full evaluation sweep, tau sensitivity, and figures.\n\n"
             "Roadmap items 6 and 8. CPU is enough: evaluation is thousands of short "
@@ -194,7 +200,13 @@ def build_metadata(spec: dict, settings: dict) -> dict:
         "enable_internet": "true",
         "dataset_sources": [slugs[k] for k in spec["datasets"]],
         "competition_sources": [],
-        "kernel_sources": [],
+        # Checkpoints cross notebooks as attached kernel output: /kaggle/working is
+        # writable but per-session, so a later notebook receives an earlier one's
+        # artefacts read-only under /kaggle/input. `utils.paths.find_checkpoint`
+        # searches there. The producing notebook must have a committed version
+        # (Save Version -> Save & Run All) or the mount is empty.
+        "kernel_sources": [f"{settings['user']}/scoutfield-{d.replace('_', '-')}"
+                           for d in spec.get("needs", [])],
         "model_sources": [],
     }
 

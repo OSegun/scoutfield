@@ -59,6 +59,49 @@ Repeat step 3 for seeds 0–4. A single seed is not evidence of convergence.
 that feeds it. `make_figures.py` reads `results/summary.json`; if that file is stale the
 figures and the data disagree and nobody notices.
 
+### 2.1 Carrying artefacts between notebooks on Kaggle
+
+Locally the steps share one working tree and this section does not apply. On Kaggle they
+are four separate kernels with no shared filesystem, and the asymmetry catches everyone
+once: **`/kaggle/working` is the only writable location, and it belongs to a single
+session.** Step 2 cannot see step 1's checkpoint by writing to the same path, because
+that path is empty in a new session.
+
+An earlier notebook's artefacts reach a later one as a read-only mount under
+`/kaggle/input`, by one of two routes:
+
+| Route | How | When to use it |
+| --- | --- | --- |
+| Kernel output | The producing notebook is committed, and the consuming notebook lists it in `kernel_sources` | Default. Generated automatically — see below |
+| Published dataset | Output tab → "New Dataset", then attach it as a normal dataset | When the artefact should be versioned and citable on its own |
+
+`kernel_sources` is generated, never hand-written. Each entry in `NOTEBOOKS` in
+`scripts/make_notebooks.py` declares what it consumes with a `needs` key, and the
+metadata follows from it:
+
+```python
+"dir": "02_calibration_shift",
+"needs": ["01_perception_finetune"],   # consumes checkpoints/perception/best.pt
+```
+
+Code never hard-codes either location. `scoutfield.utils.paths.find_checkpoint` searches
+the writable directory first and every `/kaggle/input` mount after, so the same call
+works in the session that produced the file and in the one that inherited it.
+
+**Committing is the step that is easy to forget.** A notebook run interactively keeps
+nothing: `/kaggle/working` is discarded when the session ends, and an uncommitted
+notebook exposes no output to attach. Finish every step with **Save Version → Save & Run
+All (Commit)**, and only then push and run the notebook that depends on it:
+
+```bash
+kaggle kernels push -p notebooks/01_perception_finetune
+```
+
+If a downstream step raises `FileNotFoundError: checkpoint 'perception/best.pt' not
+found`, the message lists every location searched. The cause is almost always one of
+three things: the upstream notebook was never committed, it is not listed in this
+notebook's `kernel_sources`, or the metadata was regenerated but never pushed.
+
 ---
 
 ## 3. Number → command

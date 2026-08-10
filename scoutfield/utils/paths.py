@@ -77,3 +77,43 @@ def figures_dir() -> Path:
 
 def checkpoints_dir(*parts: str) -> Path:
     return output_dir("checkpoints", *parts)
+
+
+def find_checkpoint(*parts: str) -> Path:
+    """Locate an existing checkpoint, which an *earlier notebook* may have written.
+
+    Writing and reading a checkpoint are not symmetric on Kaggle, and conflating
+    them is why notebook 02 cannot find what notebook 01 produced. A run writes to
+    ``/kaggle/working/checkpoints`` — the only writable place — but that directory
+    belongs to one session and is gone when it ends. A later notebook receives the
+    same file mounted read-only under ``/kaggle/input``, attached either as that
+    notebook's committed output (``kernel_sources``) or as a published dataset.
+
+    So both are searched, writable location first, and the first hit wins. Locally
+    there is only one location and the extra search costs nothing.
+
+    Raises rather than returning a non-existent path: a missing checkpoint means the
+    upstream notebook was never committed or never attached, and that is worth
+    saying in as many words at the point of failure.
+    """
+    tail = Path(*parts)
+    candidates = [output_dir("checkpoints") / tail]
+    if is_kaggle():
+        mounts = Path("/kaggle/input")
+        if mounts.exists():
+            # An attached notebook output reproduces the producing session's
+            # /kaggle/working, so the checkpoints/ prefix survives the mount. A
+            # dataset published from that output may or may not keep it.
+            for mount in sorted(p for p in mounts.iterdir() if p.is_dir()):
+                candidates.append(mount / "checkpoints" / tail)
+                candidates.append(mount / tail)
+    found = next((c for c in candidates if c.is_file()), None)
+    if found is None:
+        raise FileNotFoundError(
+            f"checkpoint '{tail}' not found. Searched: "
+            + ", ".join(str(c) for c in candidates)
+            + ". On Kaggle it is produced by an earlier notebook: commit that notebook "
+              "(Save Version -> Save & Run All) and attach it here as a kernel source, "
+              "or publish its output as a dataset and attach that."
+        )
+    return found
