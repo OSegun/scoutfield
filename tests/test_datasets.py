@@ -149,6 +149,22 @@ def test_plantvillage_variant_is_selected_not_merged(tmp_path):
     assert roots[0].name == "segmented"
 
 
+def test_variant_selection_survives_a_duplicated_wrapper_sibling(tmp_path):
+    """The circulated PlantVillage archive holds a fourth sibling beside the three
+    renderings — a wrapper repeating the same content. An exact-subset test fails
+    on it and lets "color" reach ``binarise_label`` as a class name.
+    """
+    _make_tree(tmp_path, [
+        "color/Tomato___healthy",
+        "grayscale/Tomato___healthy",
+        "segmented/Tomato___healthy",
+        "plantvillage dataset/color/Tomato___healthy",
+    ])
+    roots = _descend_to_class_dirs(tmp_path, variant="color")
+    assert len(roots) == 1 and roots[0].name == "color"
+    assert roots[0].parent == tmp_path
+
+
 def test_unknown_variant_raises(tmp_path):
     _make_tree(tmp_path, ["ds/color/Tomato___healthy", "ds/segmented/Tomato___healthy"])
     with pytest.raises(FileNotFoundError, match="image variant"):

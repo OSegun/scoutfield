@@ -221,13 +221,24 @@ def _descend_to_class_dirs(root: Path, variant: str = "color") -> list[Path]:
             current = subdirs[0]
             continue
 
-        if names <= _VARIANT_DIRS:
+        # Two or more variant names at one level identify it as the variant level.
+        # A strict subset test is too brittle: the circulated PlantVillage archive
+        # carries a fourth sibling, a wrapper duplicating the same three renderings,
+        # and the test would fail and let "color" through as a class name. One
+        # variant name alone is not enough — a lone directory called "segmented"
+        # says nothing — so the threshold is two.
+        if len(names & _VARIANT_DIRS) >= 2:
             chosen = next((d for d in subdirs if d.name.casefold() == variant.casefold()),
                           None)
             if chosen is None:
                 raise FileNotFoundError(
                     f"image variant '{variant}' not found under {current}; "
                     f"available: {sorted(d.name for d in subdirs)}"
+                )
+            if not any(p.is_dir() for p in chosen.iterdir()):
+                raise FileNotFoundError(
+                    f"variant directory {chosen} holds no class subdirectories; "
+                    f"the archive layout is not what this code expects"
                 )
             # A variant directory is the class-dir parent by definition, so stop
             # here rather than descending again.

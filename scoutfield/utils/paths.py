@@ -32,14 +32,27 @@ def repo_root() -> Path:
 def data_dir(dataset_slug: str | None = None) -> Path:
     """Directory holding input data.
 
-    On Kaggle, datasets are mounted read-only at ``/kaggle/input/<slug>``; the
-    slug is the last path component of the dataset's URL and is recorded in
-    ``configs/perception.yaml`` under ``data.kaggle_slugs``.
+    A dataset arrives in one of two layouts, and both occur in practice:
+
+    * **Attached as a notebook input** — Kaggle mounts it read-only at
+      ``/kaggle/input/<name>``, where ``<name>`` is the slug's last component.
+    * **Downloaded with kagglehub** — the owner is kept, giving
+      ``<cache>/datasets/<owner>/<name>``.
+
+    Both are checked, in that order, and the first that exists wins. When neither
+    does, the attached-input path is returned so the caller's error message names
+    the canonical location rather than the fallback.
+
+    Slugs are recorded in ``configs/perception.yaml`` under ``data.kaggle_slugs``.
     """
-    if is_kaggle():
-        base = Path("/kaggle/input")
-        return base / dataset_slug.split("/")[-1] if dataset_slug else base
-    return repo_root() / "data" / (dataset_slug.split("/")[-1] if dataset_slug else "")
+    base = Path("/kaggle/input") if is_kaggle() else repo_root() / "data"
+    if not dataset_slug:
+        return base
+    owner, _, name = dataset_slug.rpartition("/")
+    candidates = [base / name]
+    if owner:
+        candidates.append(base / "datasets" / owner / name)
+    return next((c for c in candidates if c.exists()), candidates[0])
 
 
 def output_dir(*parts: str) -> Path:
