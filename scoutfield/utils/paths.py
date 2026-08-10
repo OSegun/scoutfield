@@ -99,21 +99,48 @@ def find_checkpoint(*parts: str) -> Path:
     tail = Path(*parts)
     candidates = [output_dir("checkpoints") / tail]
     if is_kaggle():
-        mounts = Path("/kaggle/input")
-        if mounts.exists():
-            # An attached notebook output reproduces the producing session's
-            # /kaggle/working, so the checkpoints/ prefix survives the mount. A
-            # dataset published from that output may or may not keep it.
-            for mount in sorted(p for p in mounts.iterdir() if p.is_dir()):
-                candidates.append(mount / "checkpoints" / tail)
-                candidates.append(mount / tail)
+        # Mount depth is not fixed. An attached kernel output sits directly under
+        # /kaggle/input/<slug>, while anything fetched with kagglehub keeps its owner
+        # and lands at /kaggle/input/<kind>/<owner>/<slug>. Walking a bounded number
+        # of levels covers both without guessing which one is in play; three is enough
+        # for the deepest layout and stops well above the class directories, so the
+        # scan stays cheap even beside a 50,000-image dataset.
+        candidates.extend(
+            root / prefix / tail
+            for root in _shallow_dirs(Path("/kaggle/input"), max_depth=3)
+            for prefix in (Path("checkpoints"), Path("."))
+        )
     found = next((c for c in candidates if c.is_file()), None)
     if found is None:
+        shown = [str(c) for c in candidates[:12]]
+        if len(candidates) > len(shown):
+            shown.append(f"... and {len(candidates) - len(shown)} more")
         raise FileNotFoundError(
-            f"checkpoint '{tail}' not found. Searched: "
-            + ", ".join(str(c) for c in candidates)
+            f"checkpoint '{tail}' not found. Searched: " + ", ".join(shown)
             + ". On Kaggle it is produced by an earlier notebook: commit that notebook "
               "(Save Version -> Save & Run All) and attach it here as a kernel source, "
               "or publish its output as a dataset and attach that."
         )
+    return found
+
+
+def _shallow_dirs(base: Path, max_depth: int) -> list[Path]:
+    """``base`` and its subdirectories, breadth-first, no deeper than ``max_depth``.
+
+    Depth-limited on purpose. A plain ``rglob`` under /kaggle/input would descend into
+    every attached dataset and stat tens of thousands of image files to find one
+    checkpoint.
+    """
+    if not base.exists():
+        return []
+    found, frontier = [base], [base]
+    for _ in range(max_depth):
+        nxt = []
+        for directory in frontier:
+            try:
+                nxt.extend(p for p in sorted(directory.iterdir()) if p.is_dir())
+            except OSError:
+                continue  # unreadable mount; not worth failing the search over
+        found.extend(nxt)
+        frontier = nxt
     return found

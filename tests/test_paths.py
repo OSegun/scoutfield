@@ -54,6 +54,20 @@ def test_finds_a_checkpoint_mounted_from_an_earlier_notebook(working, tmp_path,
     assert found.read_bytes() == b"weights"
 
 
+def test_finds_a_checkpoint_nested_under_owner_and_slug(working, tmp_path, monkeypatch):
+    """kagglehub keeps the owner, so a fetched kernel output lands two levels below
+    the mount point rather than directly under it."""
+    nested = (tmp_path / "input" / "notebooks" / "odusinaoluwasegun"
+              / "scoutfield-01-perception-finetune" / "checkpoints" / "perception")
+    nested.mkdir(parents=True)
+    (nested / "best.pt").write_bytes(b"weights")
+
+    monkeypatch.setattr(paths, "is_kaggle", lambda: True)
+    monkeypatch.setattr(paths, "Path", _rooted_path(tmp_path / "input"))
+
+    assert paths.find_checkpoint("perception", "best.pt").read_bytes() == b"weights"
+
+
 def test_the_writable_directory_wins_over_a_mount(working, tmp_path, monkeypatch):
     """A checkpoint written by this session is the one this session meant."""
     local = working / "checkpoints" / "perception"
