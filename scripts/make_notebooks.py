@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -76,7 +77,9 @@ NOTEBOOKS = [
     },
     {
         "dir": "02_calibration_shift",
-        "title": "scoutfield 02 Calibration And Shift",
+        # Title must slugify to the id — see `slugify` and the check in build_metadata.
+        # "Calibration And Shift" would give ...-calibration-and-shift and not resolve.
+        "title": "scoutfield 02 Calibration Shift",
         "gpu": True,
         "datasets": ["plantvillage", "plantdoc"],
         # Consumes checkpoints/perception/best.pt from notebook 01.
@@ -178,8 +181,26 @@ def build_notebook(spec: dict, settings: dict) -> dict:
     }
 
 
+def slugify(title: str) -> str:
+    """Kaggle's rule for turning a kernel title into a URL slug.
+
+    Lowercase, non-alphanumerics collapsed to single hyphens, ends trimmed.
+    """
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
 def build_metadata(spec: dict, settings: dict) -> dict:
     slug = "scoutfield-" + spec["dir"].replace("_", "-")
+    # Kaggle derives a slug from the title and expects it to match the id. When it
+    # does not, `kaggle kernels push` warns and then fails the save with a 409
+    # Conflict — the push is rejected outright, so this is not cosmetic. Caught here
+    # because the title is free text and one stray word ("And") breaks it.
+    if slugify(spec["title"]) != slug:
+        raise ValueError(
+            f"notebook '{spec['dir']}': title {spec['title']!r} slugifies to "
+            f"{slugify(spec['title'])!r}, which does not match the kernel id "
+            f"{slug!r}. Kaggle rejects the push. Reword the title so it resolves."
+        )
     slugs = settings["slugs"]
     unknown = [k for k in spec["datasets"] if k not in slugs]
     if unknown:

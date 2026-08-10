@@ -36,7 +36,12 @@ from scoutfield.utils.seeding import seed_everything
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/perception.yaml")
-    parser.add_argument("--checkpoint", default="checkpoints/perception/best.pt")
+    # No default path. A literal one is wrong on Kaggle, where notebook 01's
+    # checkpoint arrives read-only under /kaggle/input rather than in this session's
+    # working directory, and hard-coding it here silently bypasses the search in
+    # `utils.paths.find_checkpoint`. None means "find it"; pass the flag to override.
+    parser.add_argument("--checkpoint", default=None,
+                        help="explicit checkpoint path; searched for when omitted")
     parser.add_argument("--skip-pool", action="store_true",
                         help="skip caching the logit pool the planner sweep samples from")
     args = parser.parse_args()
@@ -53,7 +58,10 @@ def main() -> None:
         print(f"{split:>6}: accuracy across the sweep = {accs}")
 
     if not args.skip_pool:
-        pool = build_logit_pool(args.checkpoint, split="test", config=cfg)
+        # `out["checkpoint"]` is the path `run` actually resolved and loaded. Passing
+        # `args.checkpoint` here would be None on the default path, and would risk
+        # pooling logits from a different checkpoint than the one just calibrated.
+        pool = build_logit_pool(out["checkpoint"], split="test", config=cfg)
         print(f"cached logit pool: { {k: len(v) for k, v in pool.items()} }")
 
 

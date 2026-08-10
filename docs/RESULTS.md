@@ -1,14 +1,14 @@
 # Results
 
-**No scientific result in this repository has been measured yet.** Every placeholder reads
-`—` and has the shape the result will take.
+**Roadmap item 1 is measured; everything downstream of it is not.** Section *"1.
+Perception"* now holds real numbers from a trained model. Every remaining placeholder
+reads `—` and has the shape the result will take.
 
-Three things *have* been measured, and are shown in bold where they appear: the coverage
-ceiling and field prevalence in section *"2. Environment"*, and the export equivalence and
-inference latency in section *"6. Deployment"*. None of them depends on a trained model —
-they are properties of the environment configuration and of the exported graph — which is
-why they exist before the perception model does. Everything that depends on trained
-weights is still a placeholder.
+Also measured, and shown in bold where they appear: the coverage ceiling and field
+prevalence in section *"2. Environment"*, and the export equivalence and inference
+latency in section *"6. Deployment"*. Neither depends on trained weights — they are
+properties of the environment configuration and of the exported graph — which is why they
+predate the perception model.
 
 This file is written *from* `results/summary.json`, not from memory. If a number here
 disagrees with that file, this file is wrong.
@@ -20,15 +20,54 @@ disagrees with that file, this file is wrong.
 Roadmap items 1 and 3. Source: `results/perception_summary.json`,
 `results/calibration_sweep.json`.
 
+Measured 10 August 2026 from commit `34e1023`, seed 0, EfficientNet-B0, 12 epochs, best
+epoch 6. Splits: 38,013 train / 8,146 val / 8,146 test (38 fine-grained classes, ~72%
+diseased); shift 2,922 across 28 classes.
+
 | Metric | PlantVillage (test) | PlantDoc (shift) |
 | --- | --- | --- |
-| Accuracy | — | — |
-| ECE at fitted `T` | — | — |
-| Signed calibration error | — | — |
+| Accuracy | **0.9998** | **0.8036** |
+| ECE at fitted `T` | **0.0004** | **0.1376** |
+| Signed calibration error | **−0.0003** | **+0.1376** |
 | NLL | — | — |
 | Brier | — | — |
 
-Fitted temperature: **—**
+Fitted temperature: **0.7723** (fitted on validation, applied to both columns)
+
+Three things in that table matter more than the headline accuracy.
+
+**The shift column is where the experiment now lives.** ECE rises 344× from in-distribution
+to shift, and the sign turns positive — overconfidence. The pilot had to *impose*
+miscalibration with a temperature knob; here it arises on its own from the lab-to-field
+gap, which is the stronger version of the same claim.
+
+**Under shift, the signed error equals the ECE exactly** (both 0.13760501).
+That identity holds only when every reliability bin errs in the same direction, so the
+shift miscalibration is uniformly overconfident rather than a mix that partially cancels.
+Worth stating, because the pilot's refuted H2 found that *direction* governs planner
+performance, not magnitude.
+
+**BASE_ACC is now ambiguous and the choice is not yet made.** `scoutfield/CLAUDE.md`,
+section *"3. Parameters"*, says only that "`BASE_ACC` becomes a *measured* quantity from
+the fine-tuned model, not a cited one" — it does not say measured on which split. The two
+candidates differ enormously:
+
+| Candidate | Value | Argument for it |
+| --- | --- | --- |
+| PlantVillage test | 0.9998 | The model's accuracy on the data it was trained for |
+| PlantDoc shift | 0.8036 | The accuracy a deployed scout would actually see; near the pilot's 0.816 |
+
+At 0.9998 accuracy and 0.0004 ECE there is almost no uncertainty left for a planner to
+consume, so an in-distribution planner sweep risks measuring nothing. This is an open
+decision, recorded here rather than settled silently; it must be resolved and justified
+in `docs/METHOD.md` before the planner sweep is interpreted.
+
+> ⚠️ **Not yet checked: augmented-duplicate leakage.** 0.9998 is consistent with the
+> literature on PlantVillage, which is lab imagery and famously easy, so it is not on its
+> own evidence of a bug. But the only thing preventing an augmented copy of one leaf from
+> straddling train and test is `_source_key` in `scoutfield/perception/datasets.py`, and
+> that has not been verified against this particular mirror of the dataset. Verify before
+> the number appears in a paper.
 
 ### Temperature sweep
 
