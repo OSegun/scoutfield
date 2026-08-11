@@ -115,6 +115,28 @@ def _env_factory(config, base_seed: int, rank: int, temperature: float, classifi
     return _init
 
 
+def _warm_logit_pool_cache() -> None:
+    """Build the classifier's logit pool once, here, before any subprocess starts.
+
+    Leaving it to the workers fails outright. ``SubprocVecEnv`` workers are daemonic,
+    and building the pool runs a ``DataLoader`` with worker processes of its own; a
+    daemonic process may not have children, so the build dies with ``AssertionError:
+    daemonic processes are not allowed to have children`` and takes the whole vec-env
+    handshake with it.
+
+    It would also be wasteful if it did work: every rank would run the same full
+    forward pass over the split to arrive at byte-identical logits.
+
+    Building here leaves the cache on disk, so each worker loads it instead. The pool
+    must be identical across workers and temperatures anyway — that is what makes the
+    sweep isolate calibration rather than sampling noise.
+    """
+    from scoutfield.perception.adapter import load_or_build_logit_pool
+    from scoutfield.utils.paths import find_checkpoint
+
+    load_or_build_logit_pool(find_checkpoint("perception", "best.pt"))
+
+
 def train_ppo(config, seed: int | None = None, classifier=None,
               total_timesteps: int | None = None) -> Path:
     """Train to convergence and return the checkpoint path.
@@ -144,6 +166,9 @@ def train_ppo(config, seed: int | None = None, classifier=None,
     run_name = f"ppo_seed{seed}"
     final_path = ckpt_dir / f"{run_name}.zip"
     resume_path = ckpt_dir / f"{run_name}_resume.zip"
+
+    if classifier is None:
+        _warm_logit_pool_cache()
 
     factories = [_env_factory(config, seed * 1000, r, 1.0, classifier)
                  for r in range(n_envs)]
