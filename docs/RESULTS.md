@@ -1,8 +1,9 @@
 # Results
 
-**Roadmap item 1 is measured; everything downstream of it is not.** Section *"1.
-Perception"* now holds real numbers from a trained model. Every remaining placeholder
-reads `—` and has the shape the result will take.
+**Perception and calibration are measured; the planner work downstream of them is not.**
+Section *"1. Perception"* now holds real numbers from a trained EfficientNet-B0 and its
+temperature sweep. Every remaining placeholder reads `—` and has the shape the result
+will take.
 
 Also measured, and shown in bold where they appear: the coverage ceiling and field
 prevalence in section *"2. Environment"*, and the export equivalence and inference
@@ -47,10 +48,12 @@ shift miscalibration is uniformly overconfident rather than a mix that partially
 Worth stating, because the pilot's refuted H2 found that *direction* governs planner
 performance, not magnitude.
 
-**BASE_ACC is now ambiguous and the choice is not yet made.** `scoutfield/CLAUDE.md`,
-section *"3. Parameters"*, says only that "`BASE_ACC` becomes a *measured* quantity from
-the fine-tuned model, not a cited one" — it does not say measured on which split. The two
-candidates differ enormously:
+**The specified BASE_ACC is 0.9998, and that choice now needs revisiting.** The split
+table in `docs/METHOD.md`, section *"2. Perception"* → *"Data"*, assigns the `test` split
+"early stopping, model selection, and the reported in-distribution accuracy that becomes
+BASE_ACC". Measured, that is 0.9998 — replacing the pilot's cited 0.816 (Ahmad et al.,
+2023) with a value at the ceiling. The alternative was not anticipated when that was
+written:
 
 | Candidate | Value | Argument for it |
 | --- | --- | --- |
@@ -69,18 +72,66 @@ in `docs/METHOD.md` before the planner sweep is interpreted.
 > that has not been verified against this particular mirror of the dataset. Verify before
 > the number appears in a paper.
 
+NLL and Brier at the fitted temperature: **0.0010** / **0.0002** in-distribution,
+**0.8057** / **0.1625** under shift.
+
 ### Temperature sweep
 
-Accuracy must be identical down the first column. That is the instrument working.
+`T` is **relative to the fitted temperature** (`sweep_is_relative_to_fitted_temperature:
+true`), so `T` = 1 is the calibrated point, exactly as in the pilot. Absolute temperature
+is `T` × 0.7723.
 
-| `T` | Accuracy | ECE | Signed error | Direction |
+Accuracy must be identical down each accuracy column. It is, to six decimal places, on
+all three splits — the instrument works on a real CNN.
+
+**PlantVillage (test), n = 8,146**
+
+| `T` | Accuracy | ECE | Signed error | Mean confidence |
 | --- | --- | --- | --- | --- |
-| 0.30 | — | — | — | overconfident |
-| 0.50 | — | — | — | overconfident |
-| 1.00 | — | — | — | calibrated |
-| 2.00 | — | — | — | underconfident |
-| 3.00 | — | — | — | underconfident |
-| 4.00 | — | — | — | underconfident |
+| 0.30 | 0.999754 | 0.0002 | +0.0002 | 0.9999 |
+| 0.50 | 0.999754 | 0.0002 | +0.0001 | 0.9999 |
+| 1.00 | 0.999754 | 0.0004 | −0.0003 | 0.9995 |
+| 2.00 | 0.999754 | 0.0031 | −0.0029 | 0.9968 |
+| 3.00 | 0.999754 | 0.0111 | −0.0110 | 0.9888 |
+| 4.00 | 0.999754 | 0.0258 | −0.0257 | 0.9740 |
+
+**PlantDoc (shift), n = 2,922**
+
+| `T` | Accuracy | ECE | Signed error | Mean confidence |
+| --- | --- | --- | --- | --- |
+| 0.30 | 0.803559 | 0.1771 | +0.1771 | 0.9806 |
+| 0.50 | 0.803559 | 0.1658 | +0.1658 | 0.9693 |
+| 1.00 | 0.803559 | 0.1376 | +0.1376 | 0.9412 |
+| 2.00 | 0.803559 | 0.0863 | +0.0862 | 0.8898 |
+| 3.00 | 0.803559 | 0.0414 | +0.0414 | 0.8450 |
+| 4.00 | 0.803559 | 0.0080 | +0.0028 | 0.8064 |
+
+**The two splits move in opposite directions, and that is the finding.** In-distribution,
+ECE is near-minimal at `T` = 1 and grows as the model is softened — the ordinary picture,
+and the one the pilot's invariant *"ECE is minimised at `T` = 1 and rises in both
+directions"* describes. Under shift, ECE **falls monotonically** across the sweep and is
+minimised at `T` = 4, a 17× reduction from `T` = 0.3.
+
+That is not the invariant breaking. It is the temperature fitted on in-distribution
+validation data failing to transfer: under shift the model is overconfident at every
+temperature tested (signed error positive throughout), and softening it by a further
+factor of ~4 — absolute `T` ≈ 3.09 — is what brings mean confidence, 0.8064, into line
+with accuracy, 0.8036.
+
+Two consequences worth stating before the planner sweep:
+
+- **A single fitted temperature does not serve both regimes.** Any deployed system that
+  calibrates on lab data and flies over a field carries roughly the miscalibration in
+  the `T` = 1 row of the shift table, not the test table.
+- **The in-distribution sweep spans an ECE range of 0.0002 to 0.0258.** The pilot's
+  planner effect was driven by a range of 0.0037 to 0.1980. The in-distribution
+  condition may therefore be too well-calibrated to move a planner at all, and the shift
+  condition is where the effect has room to appear. This bears directly on the open
+  BASE_ACC question above.
+
+Not yet measured: MC-dropout and deep ensembles (section *"5. Uncertainty methods"*),
+and reliability diagrams per condition. `reliability_at_fitted` and `per_class_at_fitted`
+are present in `results/calibration_sweep.json` but not yet plotted.
 
 ---
 

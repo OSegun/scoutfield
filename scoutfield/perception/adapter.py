@@ -1,4 +1,4 @@
-"""
+﻿"""
 The interface contract between a real classifier and the pilot's environment.
 
 Why this file exists
@@ -198,9 +198,16 @@ def find_logit_pool(checkpoint: str | Path) -> Path | None:
     search covers both: a pool shipped alongside the checkpoint in its mount, and
     one cached locally by a previous run in this session.
     """
+    from scoutfield.utils.paths import find_artifact
+
     beside = Path(checkpoint).parent / LOGIT_POOL_FILENAME
     written = pool_path_for(checkpoint)
-    return next((p for p in (beside, written) if p.is_file()), None)
+    hit = next((p for p in (beside, written) if p.is_file()), None)
+    # Last resort: a pool cached by an earlier notebook arrives in that notebook's
+    # own mount, which is neither beside this checkpoint nor in this session's
+    # writable directory. Rebuilding instead costs a full forward pass over a split
+    # and, in a notebook with no dataset attached, is not possible at all.
+    return hit or find_artifact(Path(checkpoint).parent.name, LOGIT_POOL_FILENAME)
 
 
 def save_logit_pool(path: str | Path, pool: dict[int, np.ndarray],

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Generate the notebooks and their Kaggle metadata.
 
     python scripts/make_notebooks.py          # only creates missing notebooks
@@ -109,9 +109,12 @@ NOTEBOOKS = [
         "dir": "03_ppo_training",
         "title": "scoutfield 03 PPO Training",
         "gpu": True,
-        "datasets": [],
-        # The planner observes through the fine-tuned classifier.
-        "needs": ["01_perception_finetune"],
+        # PlantVillage is the fallback, not the primary route: the planner consumes
+        # cached logits, and only needs the images if that cache is missing.
+        "datasets": ["plantvillage"],
+        # The classifier checkpoint from 01, and 02's cached logit pool — without
+        # the pool, every episode would re-run the network per observation.
+        "needs": ["01_perception_finetune", "02_calibration_shift"],
         "purpose": (
             "Train PPO on the 32x32 field with the global belief map.\n\n"
             "Roadmap items 4 and 5. The script verifies the coverage ceiling before "
@@ -130,9 +133,10 @@ NOTEBOOKS = [
         "dir": "04_evaluation_sweep",
         "title": "scoutfield 04 Evaluation Sweep",
         "gpu": False,
-        "datasets": [],
-        # Evaluates the trained PPO policies against the same classifier.
-        "needs": ["01_perception_finetune", "03_ppo_training"],
+        "datasets": ["plantvillage"],
+        # Evaluates the trained PPO policies against the same classifier and pool.
+        "needs": ["01_perception_finetune", "02_calibration_shift",
+                  "03_ppo_training"],
         "purpose": (
             "Full evaluation sweep, tau sensitivity, and figures.\n\n"
             "Roadmap items 6 and 8. CPU is enough: evaluation is thousands of short "

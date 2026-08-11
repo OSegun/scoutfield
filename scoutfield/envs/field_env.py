@@ -1,4 +1,4 @@
-"""
+﻿"""
 FieldScoutEnv: the pilot's ScoutEnv at a scale where planning can pay off.
 
 Two changes from the pilot, and the reasoning for each
@@ -149,9 +149,12 @@ def make_field_env(config, seed: int = 0, temperature: float = 1.0,
 
     if classifier is None:
         from scoutfield.perception.adapter import CNNClassifier
-        from scoutfield.utils.paths import checkpoints_dir
+        from scoutfield.utils.paths import find_checkpoint
 
-        checkpoint = checkpoint or (checkpoints_dir("perception") / "best.pt")
+        # Not `checkpoints_dir(...)`: PPO training and the sweep run in later
+        # notebooks, where notebook 01's checkpoint is mounted read-only under
+        # /kaggle/input rather than sitting in this session's writable directory.
+        checkpoint = checkpoint or find_checkpoint("perception", "best.pt")
         classifier = CNNClassifier(
             checkpoint=checkpoint,
             temperature=temperature,

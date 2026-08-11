@@ -8,10 +8,13 @@
   "enable_gpu": "true",
   "enable_tpu": "false",
   "enable_internet": "true",
-  "dataset_sources": [],
+  "dataset_sources": [
+    "abdallahalidev/plantvillage-dataset"
+  ],
   "competition_sources": [],
   "kernel_sources": [
-    "odusinaoluwasegun/scoutfield-01-perception-finetune"
+    "odusinaoluwasegun/scoutfield-01-perception-finetune",
+    "odusinaoluwasegun/scoutfield-02-calibration-shift"
   ],
   "model_sources": []
 }

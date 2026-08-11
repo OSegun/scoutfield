@@ -33,13 +33,6 @@ data/
 *.npz
 *.h5
 
-# ------------------------------------------------- local-only, not published
-# This repo is public. A file whose *name* is an assistant's name is tool
-# attribution on an academic artefact, which the project's rules forbid. The
-# contract it holds is still read locally by the developer agent; it just never
-# leaves this machine. Remove this line if you decide otherwise.
-CLAUDE.md
-
 # -------------------------------------------------------------- tooling
 .pytest_cache/
 .mypy_cache/
