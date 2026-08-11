@@ -175,8 +175,32 @@ class CNNClassifier:
 
 
 def pool_path_for(checkpoint: str | Path) -> Path:
-    """Where the cached pool lives for a given checkpoint."""
-    return Path(checkpoint).parent / LOGIT_POOL_FILENAME
+    """Where a cached pool is *written* for a given checkpoint.
+
+    Not beside the checkpoint. A checkpoint inherited from an earlier notebook is
+    mounted read-only under ``/kaggle/input``, and writing next to it fails with
+    ``OSError: [Errno 30] Read-only file system`` after the pool has already been
+    computed — the expensive part done, then thrown away.
+
+    The writable location mirrors the checkpoint's own grouping directory, so
+    ``.../checkpoints/perception/best.pt`` caches to ``<writable>/checkpoints/
+    perception/logit_pool.npz`` and two checkpoint families cannot collide.
+    """
+    from scoutfield.utils.paths import checkpoints_dir
+
+    return checkpoints_dir(Path(checkpoint).parent.name) / LOGIT_POOL_FILENAME
+
+
+def find_logit_pool(checkpoint: str | Path) -> Path | None:
+    """An existing pool for this checkpoint, or None.
+
+    Read and write locations differ once a checkpoint can arrive read-only, so the
+    search covers both: a pool shipped alongside the checkpoint in its mount, and
+    one cached locally by a previous run in this session.
+    """
+    beside = Path(checkpoint).parent / LOGIT_POOL_FILENAME
+    written = pool_path_for(checkpoint)
+    return next((p for p in (beside, written) if p.is_file()), None)
 
 
 def save_logit_pool(path: str | Path, pool: dict[int, np.ndarray],
@@ -199,8 +223,8 @@ def load_logit_pool(path: str | Path) -> dict[int, np.ndarray]:
 
 def load_or_build_logit_pool(checkpoint: str | Path, **kwargs) -> dict[int, np.ndarray]:
     """Return the cached pool if present, otherwise build and cache it."""
-    cached = pool_path_for(checkpoint)
-    if cached.exists():
+    cached = find_logit_pool(checkpoint)
+    if cached is not None:
         return load_logit_pool(cached)
     return build_logit_pool(checkpoint, **kwargs)
 
