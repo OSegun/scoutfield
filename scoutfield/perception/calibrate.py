@@ -66,7 +66,10 @@ def collect_logits(model, loader, device=None, max_batches: int | None = None):
     """
     import torch
 
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    # Shared with training: a device this build cannot target must fail here,
+    # with an explanation, rather than inside the first forward pass.
+    from scoutfield.utils.device import select_device
+    device = select_device(device)
     model = model.to(device).eval()
 
     logits, binary, fine = [], [], []

@@ -66,42 +66,6 @@ def _build_optimizer(model, train_cfg):
     )
 
 
-def _select_device() -> str:
-    """Choose a device, refusing a GPU this PyTorch build cannot target.
-
-    Kaggle still offers the Tesla P100 (sm_60) while its images ship a PyTorch
-    compiled for sm_70 and above. The mismatch is not caught at allocation: the
-    session starts, the model moves to the GPU, weights download, and the run dies
-    several minutes later inside the first batch with ``CUDA error: no kernel image
-    is available for execution on the device``. That message names neither the card
-    nor the fix, and it costs GPU quota to reach.
-
-    Only a device *older* than every shipped architecture is refused. A newer one
-    is allowed through, because PyTorch can JIT a forward-compatible PTX image for
-    it — treating that as an error would ground a run that would have worked.
-    """
-    import torch
-
-    if not torch.cuda.is_available():
-        return "cpu"
-
-    major, minor = torch.cuda.get_device_capability()
-    capability = major * 10 + minor
-    shipped = sorted(
-        int(arch.split("_")[1]) for arch in torch.cuda.get_arch_list()
-        if arch.startswith("sm_") and arch.split("_")[1].isdigit()
-    )
-    if shipped and capability < shipped[0]:
-        raise RuntimeError(
-            f"{torch.cuda.get_device_name()} has compute capability {major}.{minor} "
-            f"(sm_{capability}), but this PyTorch build ships kernels only for "
-            f"{', '.join('sm_' + str(s) for s in shipped)}. Training would fail inside "
-            f"the first batch. On Kaggle, change the session accelerator from P100 to "
-            f"GPU T4 x2 (sm_75) and re-run."
-        )
-    return "cuda"
-
-
 def _evaluate(model, loader, device, bins: int):
     from scoutfield.perception.calibrate import collect_logits, evaluate_at_temperature
 
@@ -132,6 +96,7 @@ def train(config) -> dict:
         rng_state,
         save_training_state,
     )
+    from scoutfield.utils.device import select_device
     from scoutfield.utils.paths import checkpoints_dir, repo_root, results_dir
     from scoutfield.utils.seeding import seed_everything
 
@@ -145,7 +110,7 @@ def train(config) -> dict:
     epochs = int(train_cfg["epochs"])
     freeze_epochs = int(model_cfg.get("freeze_backbone_epochs", 0))
 
-    device = _select_device()
+    device = select_device()
     loaders = build_dataloaders(config)
     model = build_model(config).to(device)
     optimizer = _build_optimizer(model, train_cfg)
