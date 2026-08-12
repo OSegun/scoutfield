@@ -115,7 +115,7 @@ def _env_factory(config, base_seed: int, rank: int, temperature: float, classifi
     return _init
 
 
-def _warm_logit_pool_cache() -> None:
+def _warm_logit_pool_cache(split: str = "test") -> None:
     """Build the classifier's logit pool once, here, before any subprocess starts.
 
     Leaving it to the workers fails outright. ``SubprocVecEnv`` workers are daemonic,
@@ -134,7 +134,7 @@ def _warm_logit_pool_cache() -> None:
     from scoutfield.perception.adapter import load_or_build_logit_pool
     from scoutfield.utils.paths import find_checkpoint
 
-    load_or_build_logit_pool(find_checkpoint("perception", "best.pt"))
+    load_or_build_logit_pool(find_checkpoint("perception", "best.pt"), split=split)
 
 
 def train_ppo(config, seed: int | None = None, classifier=None,
@@ -168,7 +168,7 @@ def train_ppo(config, seed: int | None = None, classifier=None,
     resume_path = ckpt_dir / f"{run_name}_resume.zip"
 
     if classifier is None:
-        _warm_logit_pool_cache()
+        _warm_logit_pool_cache(str(config.section("env").get("pool_split", "test")))
 
     factories = [_env_factory(config, seed * 1000, r, 1.0, classifier)
                  for r in range(n_envs)]

@@ -47,10 +47,14 @@ from pathlib import Path
 
 import numpy as np
 
-# Default location for the cached pool, written next to the checkpoint so a
-# Kaggle session that dies mid-sweep does not recompute a forward pass over the
-# whole split.
-LOGIT_POOL_FILENAME = "logit_pool.npz"
+# The cached pool's filename carries the split it was built from. A pool from the
+# in-distribution test split and one from the PlantDoc shift split are different
+# experimental conditions with different accuracy and calibration, and a single
+# filename would let one silently overwrite the other — producing a sweep whose
+# rows are labelled with one condition's ECE while the agent observed the other's
+# logits. The split is in the name so that cannot happen.
+def logit_pool_filename(split: str) -> str:
+    return f"logit_pool_{split}.npz"
 
 
 def _sigmoid(z: float) -> float:
@@ -98,11 +102,15 @@ class CNNClassifier:
         temperature: float = 1.0,
         rng: np.random.Generator | None = None,
         reference_temperature: float = 1.0,
+        pool_split: str = "test",
     ):
         self.T = float(temperature)
         self.reference_temperature = float(reference_temperature)
         self.rng = rng if rng is not None else np.random.default_rng(0)
         self._checkpoint = Path(checkpoint) if checkpoint else None
+        # Which split the observed logits come from. Recorded rather than implied:
+        # it is the experimental condition, and every result carries it.
+        self.pool_split = str(pool_split)
 
         if logit_pool is None:
             if self._checkpoint is None:
@@ -113,7 +121,7 @@ class CNNClassifier:
                     "indistinguishable from a measured one. Train the model first "
                     "(experiments/01_finetune_perception.py), or pass a pool directly."
                 )
-            logit_pool = load_or_build_logit_pool(self._checkpoint)
+            logit_pool = load_or_build_logit_pool(self._checkpoint, split=self.pool_split)
 
         self._pool = {int(k): np.asarray(v, dtype=float).ravel() for k, v in logit_pool.items()}
         if not self._pool or any(v.size == 0 for v in self._pool.values()):
@@ -174,8 +182,8 @@ class CNNClassifier:
         return float(pool[self.rng.integers(pool.size)])
 
 
-def pool_path_for(checkpoint: str | Path) -> Path:
-    """Where a cached pool is *written* for a given checkpoint.
+def pool_path_for(checkpoint: str | Path, split: str = "test") -> Path:
+    """Where a cached pool is *written* for a given checkpoint and split.
 
     Not beside the checkpoint. A checkpoint inherited from an earlier notebook is
     mounted read-only under ``/kaggle/input``, and writing next to it fails with
@@ -183,31 +191,37 @@ def pool_path_for(checkpoint: str | Path) -> Path:
     computed — the expensive part done, then thrown away.
 
     The writable location mirrors the checkpoint's own grouping directory, so
-    ``.../checkpoints/perception/best.pt`` caches to ``<writable>/checkpoints/
-    perception/logit_pool.npz`` and two checkpoint families cannot collide.
+    ``.../checkpoints/perception/best.pt`` on the shift split caches to
+    ``<writable>/checkpoints/perception/logit_pool_shift.npz``. Two checkpoint
+    families cannot collide, and neither can two splits.
     """
     from scoutfield.utils.paths import checkpoints_dir
 
-    return checkpoints_dir(Path(checkpoint).parent.name) / LOGIT_POOL_FILENAME
+    return checkpoints_dir(Path(checkpoint).parent.name) / logit_pool_filename(split)
 
 
-def find_logit_pool(checkpoint: str | Path) -> Path | None:
-    """An existing pool for this checkpoint, or None.
+def find_logit_pool(checkpoint: str | Path, split: str = "test") -> Path | None:
+    """An existing pool for this checkpoint and split, or None.
 
     Read and write locations differ once a checkpoint can arrive read-only, so the
     search covers both: a pool shipped alongside the checkpoint in its mount, and
     one cached locally by a previous run in this session.
+
+    Only split-keyed names are accepted. A legacy unkeyed ``logit_pool.npz`` is
+    deliberately ignored: its split is unknown, and guessing would reintroduce
+    exactly the condition mismatch the keying exists to prevent.
     """
     from scoutfield.utils.paths import find_artifact
 
-    beside = Path(checkpoint).parent / LOGIT_POOL_FILENAME
-    written = pool_path_for(checkpoint)
+    name = logit_pool_filename(split)
+    beside = Path(checkpoint).parent / name
+    written = pool_path_for(checkpoint, split)
     hit = next((p for p in (beside, written) if p.is_file()), None)
     # Last resort: a pool cached by an earlier notebook arrives in that notebook's
     # own mount, which is neither beside this checkpoint nor in this session's
     # writable directory. Rebuilding instead costs a full forward pass over a split
     # and, in a notebook with no dataset attached, is not possible at all.
-    return hit or find_artifact(Path(checkpoint).parent.name, LOGIT_POOL_FILENAME)
+    return hit or find_artifact(Path(checkpoint).parent.name, name)
 
 
 def save_logit_pool(path: str | Path, pool: dict[int, np.ndarray],
@@ -228,12 +242,13 @@ def load_logit_pool(path: str | Path) -> dict[int, np.ndarray]:
         return {int(k.split("_")[1]): data[k] for k in data.files if k.startswith("logits_")}
 
 
-def load_or_build_logit_pool(checkpoint: str | Path, **kwargs) -> dict[int, np.ndarray]:
-    """Return the cached pool if present, otherwise build and cache it."""
-    cached = find_logit_pool(checkpoint)
+def load_or_build_logit_pool(checkpoint: str | Path, split: str = "test",
+                             **kwargs) -> dict[int, np.ndarray]:
+    """Return the cached pool for this split if present, otherwise build and cache it."""
+    cached = find_logit_pool(checkpoint, split)
     if cached is not None:
         return load_logit_pool(cached)
-    return build_logit_pool(checkpoint, **kwargs)
+    return build_logit_pool(checkpoint, split=split, **kwargs)
 
 
 def build_logit_pool(
@@ -280,5 +295,5 @@ def build_logit_pool(
         for path, cls in dataset_items.items:
             image_paths.setdefault(binarise_label(cls), []).append(str(path))
 
-    save_logit_pool(pool_path_for(checkpoint), pool, image_paths)
+    save_logit_pool(pool_path_for(checkpoint, split), pool, image_paths)
     return pool

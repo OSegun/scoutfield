@@ -133,7 +133,9 @@ NOTEBOOKS = [
         "dir": "04_evaluation_sweep",
         "title": "scoutfield 04 Evaluation Sweep",
         "gpu": False,
-        "datasets": ["plantvillage"],
+        # The sweep runs on the shift condition, so PlantDoc is the fallback here.
+        # Normally neither is touched: 02's cached pools arrive via `needs`.
+        "datasets": ["plantvillage", "plantdoc"],
         # Evaluates the trained PPO policies against the same classifier and pool.
         "needs": ["01_perception_finetune", "02_calibration_shift",
                   "03_ppo_training"],

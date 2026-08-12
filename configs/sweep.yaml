@@ -12,6 +12,26 @@ agents: [lawnmower, random, greedy_entropy, ppo, oracle]
 
 temperatures: [0.30, 0.50, 1.00, 2.00, 3.00, 4.00]
 seeds: [0, 1, 2, 3, 4]
+
+# Which trained PPO policies to evaluate — a different axis from `seeds` above,
+# which are EVALUATION seeds (the fields each planner meets).
+#
+# Evaluating one policy across five evaluation seeds measures that policy; three
+# independently trained policies measure the method. The distinction is what a
+# reviewer asks about first, so it is stated here rather than inferred, and it is
+# recorded in results/sweep_metadata.json with every run.
+#
+# Every seed listed must have a trained checkpoint (ppo_seed<N>.zip) or the sweep
+# fails when it reaches that job.
+ppo_train_seeds: [0, 1, 2]
+
+# The experimental condition. `shift` = PlantDoc field imagery, where the
+# classifier is overconfident (ECE 0.1376) and the precision-for-recall trade this
+# study measures can actually occur. It must match `CALIBRATION_SPLIT` in
+# experiments/04_sweep.py, which pairs each row with the measured ECE for the same
+# split. See docs/RESULTS.md, section "1. Perception", for why the in-distribution
+# split is degenerate here.
+pool_split: shift
 cluster_sigmas: [0.75, 1.50, 3.00]
 
 # Held at the pilot's prevalence — see the note in configs/ppo_field32.yaml.

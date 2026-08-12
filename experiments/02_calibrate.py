@@ -1,4 +1,4 @@
-"""
+﻿"""
 Roadmap items 2, 3 and 7: calibration.
 
     python experiments/02_calibrate.py --config configs/perception.yaml
@@ -58,11 +58,19 @@ def main() -> None:
         print(f"{split:>6}: accuracy across the sweep = {accs}")
 
     if not args.skip_pool:
+        # Both conditions are cached here because this is the only stage holding the
+        # model and both datasets at once. `test` is what PPO trains through;
+        # `shift` is what the evaluation sweep runs on. A later notebook attaches
+        # this one's output and reads whichever it needs, so neither has to ship
+        # PlantDoc or re-run a forward pass to get one.
+        #
         # `out["checkpoint"]` is the path `run` actually resolved and loaded. Passing
         # `args.checkpoint` here would be None on the default path, and would risk
         # pooling logits from a different checkpoint than the one just calibrated.
-        pool = build_logit_pool(out["checkpoint"], split="test", config=cfg)
-        print(f"cached logit pool: { {k: len(v) for k, v in pool.items()} }")
+        for split in ("test", "shift"):
+            pool = build_logit_pool(out["checkpoint"], split=split, config=cfg)
+            print(f"cached logit pool [{split}]: "
+                  f"{ {k: len(v) for k, v in pool.items()} }")
 
 
 if __name__ == "__main__":

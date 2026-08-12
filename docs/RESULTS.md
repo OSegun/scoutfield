@@ -143,7 +143,7 @@ Roadmap item 4. Source: printed by `experiments/03_train_ppo.py`, `results/summa
 | --- | --- |
 | Coverage ceiling (optimistic bound) | 0.391 (analytic, from config) |
 | Measured mean coverage, lawnmower | **0.391** (5 seeds, matches the bound) |
-| Measured mean coverage, PPO | — |
+| Measured mean coverage, PPO | **0.350** (3 seeds, final 10% of training) |
 | Field prevalence at `n_parents` = 18 | **0.170** (30 seeds; pilot 12×12 measures 0.1697) |
 | Morisita index at `sigma` = 1.5 | — |
 
@@ -158,6 +158,46 @@ changing `n_parents` from 3 to 18 and what happens if it is not done.
 
 Roadmap items 5 and 8. Source: `results/summary.json`. IQM with 95% stratified bootstrap
 CI over 5 seeds.
+
+### PPO training
+
+Source: `results/ppo_curve_seed{0,1,2}.json`, 2,000,000 timesteps per seed at `T` = 1.
+These are **training** episodes, not the evaluation sweep — the tables below are still
+unmeasured. IQM over the first and last 10% of episodes.
+
+| Quantity | First 10% | Last 10% | Change |
+| --- | --- | --- | --- |
+| Detections per joule | 0.0950 | 0.1492 | **1.57×** |
+| Recall | 0.354 | 0.549 | 1.55× |
+| Coverage | 0.307 | 0.350 | 1.14× |
+| Time to first detection | 1.48 | 0.99 | 0.67× |
+| Precision | 1.000 | 1.000 | — |
+| False alarms | 0 | 0 | — |
+
+All three seeds report `converged: true`. Drift in detections/joule across the final 20%
+of training is +2.0%, +0.14% and +0.32% — flat, by the standard this phase committed to.
+
+**The agent learned selectivity, not just more flying.** Detections per joule rose 1.57×
+while coverage rose 1.14×, so the gain comes from *which* cells were visited rather than
+how many. That is the behaviour the 32×32 scale change and the 0.391 coverage ceiling
+were introduced to make possible, and it is the regime the pilot's 12×12 field could not
+reach. Seed-to-seed spread is small: 1.55×, 1.56×, 1.60×.
+
+> ⚠️ **Precision is exactly 1.000 and false alarms exactly 0 — in every episode, on every
+> seed.** This is not a bug, and it is a problem for the experiment. At `T` = 1 the
+> classifier is 0.9998-accurate in-distribution with ECE 0.0004, so at τ = 0.75 a false
+> positive essentially cannot occur. The precision/recall trade-off is therefore
+> unmeasurable in this condition.
+>
+> The pilot's central mechanism was that overconfidence *trades precision for recall*,
+> and its refuted H2 concluded that the direction of miscalibration governs planner
+> performance rather than its magnitude. Neither claim can be tested against a planner
+> whose precision is pinned at 1.0 by construction. Together with the in-distribution ECE
+> range of 0.0002–0.0258 against the pilot's 0.0037–0.1980, this is the second
+> independent indication that the in-distribution condition is degenerate for this
+> study's purpose, and that the shift condition is where the effect has room to appear.
+> This must be settled before the sweep in section *"3. Planners"* is interpreted — see
+> the BASE_ACC decision in section *"1. Perception"*.
 
 ### Detections per joule
 

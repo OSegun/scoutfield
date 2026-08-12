@@ -38,6 +38,13 @@ env:
   energy:
     hover: 1.0
     translate: 0.6
+  # Which split the agent observes through during TRAINING. `test` is what the
+  # trained policies in results/ppo_curve_seed*.json actually used; the evaluation
+  # sweep runs on `shift` (see configs/sweep.yaml). That train/evaluate difference
+  # is deliberate — a scout is calibrated on lab imagery and flown over a field —
+  # but it is a stated condition, not an accident, and changing it here invalidates
+  # the existing checkpoints.
+  pool_split: test
   observation:
     # The pilot's agent saw only a 5x5 local patch, which is one of the three named
     # causes of its underperformance. A downsampled global belief map is added here.

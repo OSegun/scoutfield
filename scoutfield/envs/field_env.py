@@ -155,11 +155,16 @@ def make_field_env(config, seed: int = 0, temperature: float = 1.0,
         # notebooks, where notebook 01's checkpoint is mounted read-only under
         # /kaggle/input rather than sitting in this session's writable directory.
         checkpoint = checkpoint or find_checkpoint("perception", "best.pt")
+        # Which split the agent observes through is an experimental condition, not
+        # a detail: `test` is in-distribution (near-perfect, almost no calibration
+        # error to consume), `shift` is PlantDoc field imagery (overconfident). It
+        # lives in the config so a run records which one it was.
         classifier = CNNClassifier(
             checkpoint=checkpoint,
             temperature=temperature,
             reference_temperature=_reference_temperature(),
             rng=np.random.default_rng(seed),
+            pool_split=str(env_cfg.get("pool_split", "test")),
         )
     else:
         classifier.set_temperature(temperature)

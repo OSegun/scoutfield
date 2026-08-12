@@ -1,4 +1,4 @@
-"""
+﻿"""
 Resumable evaluation sweep. The counterpart of the pilot's run_jobs.py.
 
     python experiments/04_sweep.py --config configs/sweep.yaml
@@ -30,6 +30,7 @@ import csv
 import functools
 import json
 import os
+from datetime import datetime, timezone
 from itertools import product
 from pathlib import Path
 
@@ -37,11 +38,21 @@ import numpy as np
 
 from scoutfield.config import load_config
 from scoutfield.utils.checkpoint import DoneRegistry
-from scoutfield.utils.paths import checkpoints_dir, results_dir
+from scoutfield.utils.paths import results_dir
 from scoutfield.utils.seeding import run_id, seed_everything
 
 INFO_KEYS = ("recall", "precision", "detections_per_joule",
              "false_alarms", "coverage", "time_to_first_detection")
+
+# The experimental condition, in one place so the reported ECE and the observed
+# logits cannot come from different splits.
+#
+# `shift` — PlantDoc field imagery: accuracy 0.8036, ECE 0.1376, overconfident in
+# every reliability bin. `test` is in-distribution and, at 0.9998 accuracy with ECE
+# 0.0004, leaves a planner nothing to consume: precision sits at exactly 1.000 with
+# zero false alarms, so the precision-for-recall trade this study measures cannot
+# occur. See docs/RESULTS.md, section "3. Planners" -> "PPO training".
+CALIBRATION_SPLIT = "shift"
 
 
 def build_job_list(cfg) -> list[dict]:
@@ -53,19 +64,30 @@ def build_job_list(cfg) -> list[dict]:
     """
     env_cfg = load_config("configs/ppo_field32.yaml").section("env")
     tau = float(env_cfg["detect_threshold"])
+    # Which trained PPO policies to evaluate. Listing them rather than defaulting to
+    # the config's single `seed` is deliberate: evaluating one policy across five
+    # evaluation seeds measures that policy, not the method. Three independently
+    # trained policies is what separates "PPO reached this" from "PPO reaches this".
+    ppo_seeds = [int(s) for s in cfg.get("ppo_train_seeds", [cfg["seed"]])]
 
     jobs = []
     for agent, temperature, seed, sigma in product(
         cfg["agents"], cfg["temperatures"], cfg["seeds"], cfg["cluster_sigmas"]
     ):
-        jobs.append({
-            "run_id": run_id(agent, seed, temperature, tau, sigma),
-            "agent": agent,
-            "seed": int(seed),
-            "temperature": float(temperature),
-            "tau": tau,
-            "sigma": float(sigma),
-        })
+        # A learned planner has one more axis than a hand-written one: which trained
+        # policy it is. That axis must reach the run id, or the done-registry treats
+        # three distinct policies as one completed job and silently skips two.
+        for ppo_seed in (ppo_seeds if agent == "ppo" else [None]):
+            suffix = "" if ppo_seed is None else f"-p{ppo_seed}"
+            jobs.append({
+                "run_id": run_id(agent, seed, temperature, tau, sigma) + suffix,
+                "agent": agent,
+                "seed": int(seed),
+                "temperature": float(temperature),
+                "tau": tau,
+                "sigma": float(sigma),
+                "ppo_train_seed": ppo_seed,
+            })
     return jobs
 
 
@@ -83,10 +105,10 @@ def _calibration_table() -> dict:
         return {}
     with path.open("r", encoding="utf-8") as fh:
         data = json.load(fh)
-    return data.get("splits", {}).get("shift", {}).get("sweep", {})
+    return data.get("splits", {}).get(CALIBRATION_SPLIT, {}).get("sweep", {})
 
 
-def _make_agent(name: str, seed: int, cfg):
+def _make_agent(name: str, seed: int, cfg, ppo_train_seed: int | None = None):
     """Construct one planner by name. All go through the same evaluation path."""
     from agents import GreedyEntropyAgent, LawnmowerAgent, RandomAgent, ReinforceAgent
 
@@ -105,7 +127,12 @@ def _make_agent(name: str, seed: int, cfg):
     if name == "oracle":
         return OraclePlanner()
     if name == "ppo":
-        return PPOPlanner(checkpoints_dir("ppo") / f"ppo_seed{cfg['seed']}.zip")
+        # Resolved, not composed from the writable directory: on Kaggle these
+        # policies arrive read-only from notebook 03's output under /kaggle/input.
+        from scoutfield.utils.paths import find_checkpoint
+
+        policy_seed = cfg["seed"] if ppo_train_seed is None else ppo_train_seed
+        return PPOPlanner(find_checkpoint("ppo", f"ppo_seed{policy_seed}.zip"))
     raise KeyError(f"unknown agent '{name}'")
 
 
@@ -120,7 +147,7 @@ def run_job(job: dict, cfg, classifier=None) -> dict:
     env_config = load_config("configs/ppo_field32.yaml")
     episodes = int(cfg["eval_episodes"])
 
-    agent = _make_agent(job["agent"], job["seed"], cfg)
+    agent = _make_agent(job["agent"], job["seed"], cfg, job.get("ppo_train_seed"))
     calibration = _calibration_table().get(f"{job['temperature']:g}", {})
 
     if classifier is None:
@@ -129,12 +156,17 @@ def run_job(job: dict, cfg, classifier=None) -> dict:
         # runtime of every baseline.
         from scoutfield.envs.field_env import _reference_temperature
         from scoutfield.perception.adapter import CNNClassifier
+        from scoutfield.utils.paths import find_checkpoint
 
+        # The pool split must match the split `_calibration_table` reads its ECEs
+        # from. Pairing shift ECEs with in-distribution logits produces a table
+        # that looks entirely reasonable and relates two different conditions.
         classifier = CNNClassifier(
-            checkpoint=checkpoints_dir("perception") / "best.pt",
+            checkpoint=find_checkpoint("perception", "best.pt"),
             temperature=job["temperature"],
             reference_temperature=_reference_temperature(),
             rng=np.random.default_rng(job["seed"]),
+            pool_split=CALIBRATION_SPLIT,
         )
 
     rows = []
@@ -163,7 +195,70 @@ def run_job(job: dict, cfg, classifier=None) -> dict:
     row["ece"] = calibration.get("ece")
     row["signed_calibration_error"] = calibration.get("signed_calibration_error")
     row["accuracy"] = calibration.get("accuracy")
+    # Carried per row, not only in the run metadata: a CSV gets copied into a
+    # notebook, merged with another, or read a year later, and a row that does not
+    # say which condition produced it is a row that will eventually be compared
+    # against one from the other condition.
+    row["pool_split"] = getattr(classifier, "pool_split", CALIBRATION_SPLIT)
     return row
+
+
+def write_run_metadata(cfg, jobs: list[dict], path: Path) -> dict:
+    """Record how this sweep was produced, beside the results it produced.
+
+    A number is only reproducible if the conditions that made it are recoverable.
+    Several of these are invisible in the results file itself — which split the
+    agent observed through, which trained policies were evaluated, which commit
+    was running — and each has already been, at some point, the difference between
+    a correct result and a plausible-looking wrong one.
+
+    Written every invocation. The sweep is resumable and runs in chunks, so the
+    file always describes the configuration of the most recent chunk; a mid-sweep
+    config change shows up as a changed file rather than as silence.
+    """
+    from scoutfield.utils.paths import find_checkpoint
+
+    env_cfg = load_config("configs/ppo_field32.yaml").section("env")
+    try:
+        checkpoint = str(find_checkpoint("perception", "best.pt"))
+    except FileNotFoundError:
+        checkpoint = None
+
+    meta = {
+        "experiment": "04_sweep",
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "git_commit": _git_commit(),
+        "pool_split": CALIBRATION_SPLIT,
+        "perception_checkpoint": checkpoint,
+        "ppo_train_seeds": sorted({j["ppo_train_seed"] for j in jobs
+                                   if j.get("ppo_train_seed") is not None}),
+        "evaluation_seeds": [int(x) for x in cfg["seeds"]],
+        "agents": list(cfg["agents"]),
+        "temperatures": [float(t) for t in cfg["temperatures"]],
+        "cluster_sigmas": [float(x) for x in cfg["cluster_sigmas"]],
+        "tau": float(env_cfg["detect_threshold"]),
+        "eval_episodes": int(cfg["eval_episodes"]),
+        "grid": env_cfg["grid"],
+        "budget": env_cfg["budget"],
+        "n_jobs": len(jobs),
+        "configs": {"sweep": str(cfg.path), "env": "configs/ppo_field32.yaml"},
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        json.dump(meta, fh, indent=2)
+    return meta
+
+
+def _git_commit() -> str | None:
+    """The commit this ran from, or None outside a checkout."""
+    import subprocess
+
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
+                             text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out.stdout.strip() or None
 
 
 def _append_row(path: Path, row: dict) -> None:
@@ -204,6 +299,9 @@ def main() -> None:
             print("registry cleared")
 
     jobs = build_job_list(cfg)
+    meta = write_run_metadata(cfg, jobs, results_dir() / "sweep_metadata.json")
+    print(f"condition: pool_split={meta['pool_split']}, "
+          f"ppo_train_seeds={meta['ppo_train_seeds']}, commit={meta['git_commit']}")
     pending = [j for j in jobs if j["run_id"] not in registry]
     print(f"{len(jobs) - len(pending)}/{len(jobs)} jobs already done; "
           f"running up to {budget} of the remaining {len(pending)}")
