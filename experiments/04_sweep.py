@@ -323,10 +323,30 @@ def main() -> None:
 
         summary = write_summary(csv_path, runner["summary_json"], cfg)
         print(f"wrote {runner['summary_json']} from {summary['n_rows']} rows")
-    # Exit 0 while work remains, non-zero when finished, so the shell while-loop
-    # in the module docstring keeps going and then stops on its own.
-    raise SystemExit(0 if remaining else 1)
+    # Exit 0 while work remains, 1 when finished, so the shell while-loop in the
+    # module docstring keeps going and then stops on its own. An unhandled error
+    # exits 2 — see the wrapper below for why that distinction is load-bearing.
+    if remaining:
+        raise SystemExit(0)
+    print(f"SWEEP COMPLETE: {len(jobs)} jobs")
+    raise SystemExit(1)
 
 
 if __name__ == "__main__":
-    main()
+    # `while python 04_sweep.py; do :; done` stops on ANY non-zero exit, so a crash
+    # is indistinguishable from a finished sweep: the loop exits quietly, the
+    # notebook proceeds to the figures, and the only symptom is a summary that was
+    # never written. That happened once. It now says so.
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as exc:                       # noqa: BLE001 - reported, not swallowed
+        import traceback
+
+        traceback.print_exc()
+        print(f"\nSWEEP ABORTED, jobs remain: {type(exc).__name__}: {exc}\n"
+              f"The done-registry is intact, so fixing the cause and re-running "
+              f"resumes from here. Do NOT delete results/_done.json — that discards "
+              f"every completed job.")
+        raise SystemExit(2) from exc

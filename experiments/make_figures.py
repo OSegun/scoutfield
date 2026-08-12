@@ -1,4 +1,4 @@
-"""
+﻿"""
 Regenerate every figure from results/summary.json.
 
     python experiments/make_figures.py
@@ -136,7 +136,7 @@ def figure_13_detections_per_joule(summary, plt) -> Path:
 
 def figure_10_temperature_sweep(plt) -> Path | None:
     """Accuracy invariance and the ECE curve, from the calibration run."""
-    path = results_dir() / "calibration_sweep.json"
+    path = _find_result("calibration_sweep.json")
     if not path.exists():
         print("  skipping Figure 10: results/calibration_sweep.json not found")
         return None
@@ -190,9 +190,35 @@ def figure_11_coverage_ceiling(plt) -> Path:
     return _save(fig, 11)
 
 
+def _find_result(name: str):
+    """A results file from this session, or from an earlier notebook's mount.
+
+    Figures 10 and 12 are drawn from artefacts notebooks 02 and 03 produced. In a
+    fresh session those are not in ``results/`` — they arrive read-only under
+    ``/kaggle/input``. Looking only locally silently skips the figure and leaves a
+    figure set that is quietly missing two panels.
+    """
+    from pathlib import Path
+
+    from scoutfield.utils.paths import find_artifact
+
+    local = results_dir() / name
+    return local if local.exists() else find_artifact("results", name)
+
+
+def _find_results_glob(pattern: str, limit: int = 10) -> list:
+    """``_find_result`` over a numbered family, e.g. ``ppo_curve_seed{}.json``.
+
+    A glob cannot cross mount points that are discovered rather than known, so the
+    index is enumerated instead. Ten covers any seed count this study will use.
+    """
+    found = [_find_result(pattern.format(i)) for i in range(limit)]
+    return [p for p in found if p is not None]
+
+
 def figure_12_ppo_curves(plt) -> Path | None:
     """Learning curves over every seed that has been trained."""
-    curves = sorted(results_dir().glob("ppo_curve_seed*.json"))
+    curves = _find_results_glob("ppo_curve_seed{}.json")
     if not curves:
         print("  skipping Figure 12: no results/ppo_curve_seed*.json found")
         return None

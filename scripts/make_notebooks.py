@@ -149,7 +149,21 @@ NOTEBOOKS = [
             "warning."
         ),
         "calls": [
-            "!while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done",
+            "# The loop stops on any non-zero exit, so the exit code is reported rather",
+            "# than discarded: 1 = every job done, 2 = aborted with jobs remaining.",
+            "# Without this a crash and a finished sweep look identical, and the only",
+            "# symptom is a summary that was never written.",
+            "!bash -c 'while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done; "
+            "code=$?; echo \"sweep loop exited with $code\"; exit 0'",
+            "",
+            "# Guard the rest of the cell: the tau analysis and the figures both read",
+            "# the sweep summary, and running them on a partial sweep produces plots",
+            "# that look finished.",
+            "import os",
+            "assert os.path.exists('results/summary.json'), (",
+            "    'summary.json missing: the sweep did not complete. Re-run the cell "
+            "above; it resumes from results/_done.json.')",
+            "",
             "!python experiments/05_tau_sensitivity.py --config configs/sweep.yaml",
             "!python experiments/make_figures.py",
         ],
