@@ -31,6 +31,10 @@ from scoutfield.analysis.stats import iqm, probability_of_improvement, stratifie
 METRICS = ("detections_per_joule", "recall", "precision",
            "coverage", "false_alarms", "time_to_first_detection")
 
+#: Sweep columns that are labels, not measurements, and must not be coerced to
+#: float. Every other column is required to be numeric — see ``read_rows``.
+TEXT_COLUMNS = ("agent", "run_id", "pool_split")
+
 
 def read_rows(csv_path: str | Path) -> list[dict]:
     """Read a sweep CSV, coercing the numeric columns."""
@@ -42,9 +46,22 @@ def read_rows(csv_path: str | Path) -> list[dict]:
 
     for row in rows:
         for key, value in list(row.items()):
-            if key in ("agent", "run_id"):
+            if key in TEXT_COLUMNS:
                 continue
-            row[key] = float(value) if value not in ("", None) else None
+            if value in ("", None):
+                row[key] = None
+                continue
+            try:
+                row[key] = float(value)
+            except ValueError as exc:
+                # Adding a label column to the sweep CSV used to fail here, deep in
+                # aggregation and long after the sweep had finished — the jobs were
+                # intact but the summary was never written. Say what to do instead.
+                raise ValueError(
+                    f"column '{key}' holds the non-numeric value {value!r}. If it is a "
+                    f"label rather than a measurement, add it to TEXT_COLUMNS in "
+                    f"scoutfield/analysis/summary.py."
+                ) from exc
     return rows
 
 
