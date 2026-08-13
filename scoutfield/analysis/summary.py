@@ -93,7 +93,12 @@ def build_summary(csv_path: str | Path, config=None) -> dict[str, Any]:
 
     cells: dict[str, Any] = {}
     for (agent, temperature), group in sorted(by_cell.items()):
-        strata = np.array([r["seed"] for r in group])
+        # Stratify by evaluation seed AND, for a learned planner, by which trained
+        # policy produced the row. A PPO cell holds three independently trained
+        # policies across five evaluation seeds; treating training-seed variation
+        # as evaluation-seed variation resamples across it and narrows the
+        # interval, which is the direction that manufactures significance.
+        strata = np.array([f"{r['seed']}|{r.get('ppo_train_seed')}" for r in group])
         entry = {"agent": agent, "temperature": temperature, "n_runs": len(group)}
         for metric in METRICS:
             values = np.array([r[metric] for r in group if r.get(metric) is not None],

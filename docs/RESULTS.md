@@ -199,27 +199,73 @@ reach. Seed-to-seed spread is small: 1.55×, 1.56×, 1.60×.
 > This must be settled before the sweep in section *"3. Planners"* is interpreted — see
 > the BASE_ACC decision in section *"1. Perception"*.
 
+Measured 12 August 2026 from commit `f6a5c47`, 630 jobs, `pool_split: shift`. IQM with
+95% stratified bootstrap CI. Source: `results/summary.json`, `results/sweep_metadata.json`.
+
 ### Detections per joule
 
 | Planner | `T`=0.3 | `T`=1.0 | `T`=4.0 | Degradation `T`=1→4 |
 | --- | --- | --- | --- | --- |
-| Lawnmower | — | — | — | — |
-| Random | — | — | — | — |
-| GreedyEntropy | — | — | — | — |
-| PPO | — | — | — | — |
-| Oracle (greedy, lower bound) | — | — | — | — |
+| Oracle (greedy, lower bound) | 0.2497 [0.2149, 0.2700] | 0.2478 [0.2142, 0.2671] | 0.2364 [0.2094, 0.2501] | 1.05× |
+| Lawnmower | 0.0910 [0.0780, 0.1009] | 0.0870 [0.0746, 0.0964] | 0.0683 [0.0589, 0.0756] | **1.27×** |
+| GreedyEntropy | 0.0738 [0.0616, 0.0817] | 0.0612 [0.0505, 0.0693] | 0.0410 [0.0343, 0.0467] | **1.49×** |
+| Random | 0.0391 [0.0333, 0.0437] | 0.0384 [0.0328, 0.0429] | 0.0350 [0.0299, 0.0393] | 1.10× |
+| PPO | *withheld* | *withheld* | *withheld* | *withheld* |
+
+> **PPO's rows are withheld, not missing.** The trained policies used
+> `env.pool_split: test` while the sweep evaluates on `shift`, so PPO was the only
+> planner evaluated away from the distribution it was fitted on — it scored 0.149
+> detections/joule in training and 0.086 here, while the hand-written baselines have no
+> training distribution to be outside of. The comparison would measure that gap rather
+> than the planner. `configs/ppo_field32.yaml` now sets `pool_split: shift`; the numbers
+> return once the three policies are retrained and the 270 PPO jobs re-run. Recording
+> them meanwhile would put a number in circulation that the method does not support.
 
 ### Regret against the oracle
 
+At `T` = 1, the calibrated point.
+
 | Planner | Regret on detections/joule | Regret on recall |
 | --- | --- | --- |
-| Lawnmower | — | — |
-| GreedyEntropy | — | — |
-| PPO | — | — |
+| Lawnmower | 0.1609 | 0.6425 |
+| GreedyEntropy | 0.1866 | 0.7458 |
+| Random | 0.2095 | 0.8297 |
+| PPO | *withheld — see above* | *withheld* |
 
 The oracle is greedy nearest-diseased-cell, a **lower bound** on the true ceiling, since
 optimal routing under an energy budget is NP-hard. Regret against it therefore
-*understates* the real gap.
+*understates* the real gap. It is large: the best baseline recovers about a third of the
+oracle's detections per joule and a third of its recall.
+
+### Two findings that do not reproduce the pilot
+
+**The 13.4× collapse does not survive a real classifier.** Lawnmower degrades **1.27×**
+from `T` = 1 to `T` = 4, against the pilot's 13.4× — an order of magnitude smaller. The
+effect exists and is in the same direction, but not at the reported magnitude. The pilot's
+ECE range was 0.0037–0.1980; the range reachable here on the shift split is 0.0080–0.1771
+at comparable temperatures, so the manipulation is comparable and the difference lies in
+the perception model, not the sweep.
+
+**The robustness ordering reverses.** The pilot found GreedyEntropy the more robust
+planner — 1.84× against Lawnmower's 13.4× — and reported a ranking reversal at `T` = 4
+where GreedyEntropy beat Lawnmower 7.3×. Here GreedyEntropy is the **least** robust
+non-trivial planner (1.49× against Lawnmower's 1.27×) and is beaten by Lawnmower at every
+temperature. No ranking reversal occurs anywhere in the sweep: the ordering is Oracle >
+Lawnmower > GreedyEntropy > Random at all six temperatures, with PPO between Lawnmower
+and GreedyEntropy when its rows are included.
+
+A mechanism is visible in the false-alarm counts. As `T` rises from 1 to 4, Lawnmower's
+false alarms fall 102.9 → 44.4 and its precision rises 0.343 → 0.483, the precision-for-
+recall trade the pilot describes. GreedyEntropy's false alarms *rise*, 101.3 → 118.7,
+while its precision falls 0.273 → 0.179. An entropy-seeking planner steers toward
+uncertain cells, and softening the classifier manufactures exactly those, so the planner
+is drawn to the cells the miscalibration has corrupted. That coupling between the
+calibration error and the planner's own objective did not appear in the pilot, where the
+learned agent was too weak for its objective to matter.
+
+Both are reported as measured. The pilot's numbers are not wrong for the pilot's
+instrument; what changed is the classifier, which is the contribution this phase exists
+to make.
 
 ---
 
@@ -227,19 +273,37 @@ optimal routing under an energy budget is NP-hard. Regret against it therefore
 
 Roadmap item 6. Source: `results/tau_sensitivity.csv`.
 
-Until this table has numbers, the pilot's 13.4× may be quoted only as "at τ = 0.75".
-(13.4×, not 13.5× — the latter comes from dividing rounded endpoints; the full-precision
-values in the pilot's `summary.json` give 13.41×.)
+Measured 12 August 2026, `pool_split: shift`, 5 seeds per cell. Effect size is the
+detections-per-joule ratio between `T` = 1 and `T` = 4. PPO runs a reduced τ grid because
+its evaluation is ~30× slower than the baselines; its rows are additionally subject to the
+training-condition caveat in section *"3. Planners"*.
 
-| τ | Effect size, `T`=1→4 (IQM) | 95% CI |
-| --- | --- | --- |
-| 0.55 | — | — |
-| 0.60 | — | — |
-| 0.65 | — | — |
-| 0.70 | — | — |
-| 0.75 | — | — |
-| 0.85 | — | — |
-| 0.90 | — | — |
+| τ | Lawnmower | GreedyEntropy | Random | Oracle | PPO |
+| --- | --- | --- | --- | --- | --- |
+| 0.55 | 1.02× | 1.53× | 1.01× | 1.00× | — |
+| 0.60 | 1.07× | 1.53× | 1.03× | 1.00× | 1.22× |
+| 0.65 | 1.14× | 1.52× | 1.05× | 1.01× | — |
+| 0.70 | 1.20× | 1.52× | 1.08× | 1.02× | — |
+| 0.75 | **1.27×** | **1.52×** | 1.10× | 1.04× | 1.39× |
+| 0.85 | 1.74× | 1.58× | 1.21× | 1.15× | — |
+| 0.90 | **2.32×** | 1.82× | 1.32× | 1.23× | 2.05× |
+
+**The pilot's caveat is confirmed: the effect size is strongly τ-dependent.** Lawnmower's
+degradation more than doubles across the tested range, 1.02× at τ = 0.55 to 2.32× at
+τ = 0.90. Quoting any single figure as "the" effect size is therefore not defensible
+without the threshold attached — which is what the pilot's own threats-to-validity
+section anticipated.
+
+**The dependence is planner-specific, which the pilot did not predict.** GreedyEntropy is
+nearly flat below τ = 0.85 (1.53 → 1.52 → 1.52 → 1.52) and rises only at the extreme,
+while Lawnmower climbs monotonically throughout. The two curves cross between τ = 0.75
+and τ = 0.85: below that, GreedyEntropy degrades more; above it, Lawnmower does. Any claim
+about which planner is more robust to miscalibration is therefore a claim about a τ
+regime, not about the planners.
+
+The oracle's near-invariance (1.00× to 1.23×) is the control working as intended: it plans
+on ground truth, so it should be almost unaffected by classifier calibration, and the
+residual rise at high τ reflects the confirmation threshold alone.
 
 ---
 

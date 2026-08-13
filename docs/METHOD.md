@@ -141,6 +141,35 @@ the sign, and the pilot's refuted hypothesis H2 is precisely a finding about dir
 mattering more than magnitude: overconfidence trades precision for recall, while
 underconfidence loses both.
 
+### The logit pool, and its one limitation
+
+The environment cannot run a network per observation: a scouting episode makes hundreds of
+observations and the sweep runs thousands of episodes. Instead the network is run once over
+a split, the logits are cached by true label, and `CNNClassifier.observe(label)` draws from
+that cache. Temperature acts only on logits, so caching is exact rather than approximate —
+no fidelity is lost relative to running the network each time.
+
+Which split the cache comes from **is the experimental condition**, and the two are not
+interchangeable: `test` is in-distribution PlantVillage (8,146 logits, accuracy 0.9998),
+`shift` is PlantDoc field imagery (2,922 logits, accuracy 0.8036). Pools are stored under
+split-keyed filenames so one cannot silently stand in for the other, the condition is
+written into every row of `results/sweep_results.csv`, and training and evaluation must
+use the same one — see `docs/RESULTS.md`, section *"3. Planners"*, for what happened when
+they did not.
+
+**Limitation: the pool is finite, and small on the shift split.** It holds 823 healthy and
+2,099 diseased logits, while a single episode at ~0.35 coverage makes roughly 358
+observations. Draws are with replacement, so an episode reuses a meaningful fraction of
+the healthy pool and two episodes are not fully independent in the logits they see.
+
+This is a bootstrap from the empirical logit distribution rather than draws from a
+generative model, and it is a departure from the pilot, whose Gaussian surrogate could
+supply unlimited independent draws. The trade is deliberate — the empirical distribution
+is the real classifier's, including whatever asymmetry and heavy tails it has, which is
+the point of this phase — but it means confidence intervals over episodes understate
+variance slightly, and a result resting on differences smaller than the pool's granularity
+should not be trusted. Report the pool sizes alongside any such result.
+
 ---
 
 ## 3. Environment
