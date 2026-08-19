@@ -67,17 +67,30 @@ def read_rows(csv_path: str | Path) -> list[dict]:
 
 def _aggregate(values: np.ndarray, strata: np.ndarray, resamples: int, ci: float) -> dict:
     """IQM plus a stratified bootstrap interval, or the mean when too few samples."""
+    stratified_by = "seed"
     if values.size >= 4:
         point = iqm(values)
-        lo, hi = stratified_bootstrap_ci(values, strata, resamples=resamples, ci=ci)
+        try:
+            lo, hi = stratified_bootstrap_ci(values, strata, resamples=resamples, ci=ci)
+        except ValueError as exc:
+            # A cell holding one run per seed has no within-stratum replicate to
+            # draw, so resampling within strata would return a zero-width interval.
+            # Pool instead, and record that the interval was computed a different
+            # way: an unlabelled interval that means something else is worse than
+            # no interval at all.
+            if "one member" not in str(exc):
+                raise
+            lo, hi = stratified_bootstrap_ci(values, strata, resamples=resamples, ci=ci,
+                                             allow_unstratified=True)
+            stratified_by = "pooled (no within-seed replicates)"
         estimator = "iqm"
     else:
         # Below four samples the IQM is undefined. Report the mean and say so,
         # rather than silently switching estimators inside one table.
         point, lo, hi = float(values.mean()), float("nan"), float("nan")
-        estimator = "mean"
+        estimator, stratified_by = "mean", None
     return {"estimator": estimator, "value": point, "ci_low": lo, "ci_high": hi,
-            "n": int(values.size)}
+            "n": int(values.size), "ci_stratified_by": stratified_by}
 
 
 def build_summary(csv_path: str | Path, config=None) -> dict[str, Any]:

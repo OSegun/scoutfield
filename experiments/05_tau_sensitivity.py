@@ -83,21 +83,33 @@ def run_tau_sweep(cfg, agents=None, job_budget: int | None = None) -> Path:
     csv_path = results_dir() / "tau_sensitivity.csv"
     registry = DoneRegistry(results_dir() / "_done_tau.json")
 
+    # Cluster scales. The baselines run all of them, so each (agent, tau) cell holds
+    # several runs per seed and the stratified bootstrap has something to resample —
+    # the first version pinned sigma to the median scale, which left one run per
+    # stratum and produced zero-width intervals. See scoutfield.analysis.stats.
+    #
+    # PPO keeps the single median scale: its evaluation is ~30x slower, and three
+    # scales across the reduced tau grid would not finish in a Kaggle session. Its
+    # intervals are therefore pooled rather than stratified, and recorded as such.
+    all_sigmas = [float(s) for s in cfg["cluster_sigmas"]]
+    median_sigma = all_sigmas[len(all_sigmas) // 2]
+
     jobs = []
     for agent in agents:
         grid = PPO_TAU_GRID if agent == "ppo" else TAU_GRID
+        sigmas = [median_sigma] if agent == "ppo" else all_sigmas
         for tau in grid:
             for temperature in cfg["temperatures"]:
                 for seed in cfg["seeds"]:
-                    sigma = float(cfg["cluster_sigmas"][len(cfg["cluster_sigmas"]) // 2])
-                    jobs.append({
-                        "run_id": run_id(agent, seed, temperature, tau, sigma),
-                        "agent": agent,
-                        "seed": int(seed),
-                        "temperature": float(temperature),
-                        "tau": float(tau),
-                        "sigma": sigma,
-                    })
+                    for sigma in sigmas:
+                        jobs.append({
+                            "run_id": run_id(agent, seed, temperature, tau, sigma),
+                            "agent": agent,
+                            "seed": int(seed),
+                            "temperature": float(temperature),
+                            "tau": float(tau),
+                            "sigma": sigma,
+                        })
 
     pending = [j for j in jobs if j["run_id"] not in registry]
     print(f"{len(jobs) - len(pending)}/{len(jobs)} tau jobs done; "
@@ -151,10 +163,23 @@ def effect_size_by_tau(results, low: float = 1.0, high: float = 4.0) -> dict:
             "ratio": (lo_iqm / hi_iqm) if hi_iqm > 0 else float("inf"),
             "n": int(lo_vals.size),
         }
+        # Stratify by seed where the design supplies replicates within a seed, and
+        # fall back to a pooled bootstrap where it does not — PPO runs one cluster
+        # scale, so its strata are singletons. The fallback is recorded per entry
+        # rather than applied silently: an interval computed a different way must
+        # say so, or the caveat is lost the moment the number is quoted.
+        entry["ci_stratified_by"] = "seed"
         try:
             entry["ci_T1"] = stratified_bootstrap_ci(lo_vals, strata, resamples=2000)
-        except ValueError:
-            entry["ci_T1"] = None
+        except ValueError as exc:
+            if "one member" not in str(exc):
+                entry["ci_T1"] = None
+                entry["ci_stratified_by"] = None
+            else:
+                entry["ci_T1"] = stratified_bootstrap_ci(
+                    lo_vals, strata, resamples=2000, allow_unstratified=True
+                )
+                entry["ci_stratified_by"] = "pooled (no within-seed replicates)"
         out[f"{agent}@tau{tau:g}"] = entry
     return out
 

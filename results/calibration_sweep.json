@@ -1,0 +1,457 @@
+{
+  "config": "configs/perception.yaml",
+  "checkpoint": "/kaggle/input/notebooks/odusinaoluwasegun/scoutfield-01-perception-finetune/checkpoints/perception/best.pt",
+  "fitted_temperature": 0.7723200428507138,
+  "splits": {
+    "val": {
+      "fitted_temperature": 0.7723200428507138,
+      "at_fitted_temperature": {
+        "temperature": 1.0,
+        "accuracy": 0.9991406825435797,
+        "ece": 0.0006774137527006261,
+        "signed_calibration_error": 0.00016890009538847236,
+        "maximum_calibration_error": 0.33228029436006157,
+        "nll": 0.001959279377042499,
+        "brier": 0.000630603562746599,
+        "mean_confidence": 0.9993095826389682,
+        "n": 8146
+      },
+      "raw_at_unit_temperature": {
+        "temperature": 1.0,
+        "accuracy": 0.9991406825435797,
+        "ece": 0.0008636906292723969,
+        "signed_calibration_error": -0.00021574965100937645,
+        "maximum_calibration_error": 0.3780441044007755,
+        "nll": 0.0021179672170842543,
+        "brier": 0.0006125697574436183,
+        "mean_confidence": 0.9989249328925704,
+        "n": 8146
+      },
+      "sweep": {
+        "0.3": {
+          "temperature": 0.3,
+          "accuracy": 0.9991406825435797,
+          "ece": 0.0008531434699690685,
+          "signed_calibration_error": 0.0006986781334869653,
+          "maximum_calibration_error": 0.8109229562753596,
+          "nll": 0.00406017161952826,
+          "brier": 0.0007590418865857049,
+          "mean_confidence": 0.9998393606770667,
+          "n": 8146
+        },
+        "0.5": {
+          "temperature": 0.5,
+          "accuracy": 0.9991406825435797,
+          "ece": 0.0008813799016500359,
+          "signed_calibration_error": 0.0005749116825746439,
+          "maximum_calibration_error": 0.7054965343996269,
+          "nll": 0.0026574600571417873,
+          "brier": 0.0007204844763923854,
+          "mean_confidence": 0.9997155942261544,
+          "n": 8146
+        },
+        "1": {
+          "temperature": 1.0,
+          "accuracy": 0.9991406825435797,
+          "ece": 0.0006774137527006261,
+          "signed_calibration_error": 0.00016890009538847236,
+          "maximum_calibration_error": 0.33228029436006157,
+          "nll": 0.001959279377042499,
+          "brier": 0.000630603562746599,
+          "mean_confidence": 0.9993095826389682,
+          "n": 8146
+        },
+        "2": {
+          "temperature": 2.0,
+          "accuracy": 0.9991406825435797,
+          "ece": 0.002676600712261149,
+          "signed_calibration_error": -0.0022680742683124427,
+          "maximum_calibration_error": 0.5216410173501649,
+          "nll": 0.003971361838987434,
+          "brier": 0.0006821773342707195,
+          "mean_confidence": 0.9968726082752672,
+          "n": 8146
+        },
+        "3": {
+          "temperature": 3.0,
+          "accuracy": 0.9991406825435797,
+          "ece": 0.010409903157236037,
+          "signed_calibration_error": -0.010071191142851398,
+          "maximum_calibration_error": 0.3029940392804701,
+          "nll": 0.011897937284354152,
+          "brier": 0.0011394970131333297,
+          "mean_confidence": 0.9890694914007282,
+          "n": 8146
+        },
+        "4": {
+          "temperature": 4.0,
+          "accuracy": 0.9991406825435797,
+          "ece": 0.024668054022524095,
+          "signed_calibration_error": -0.024649175786100937,
+          "maximum_calibration_error": 0.28709593665683975,
+          "nll": 0.027071102228059463,
+          "brier": 0.0023188501531349235,
+          "mean_confidence": 0.9744915067574786,
+          "n": 8146
+        }
+      },
+      "sweep_is_relative_to_fitted_temperature": true,
+      "per_class_at_fitted": {
+        "0": {
+          "n": 2252,
+          "signed_calibration_error": 0.00045967355282317885,
+          "maximum_calibration_error": 0.2849440998479621,
+          "nll": 0.004153866486626032,
+          "brier": 0.0013249315959645753
+        },
+        "1": {
+          "n": 5894,
+          "signed_calibration_error": 5.780036241537431e-05,
+          "maximum_calibration_error": 0.4943923806093063,
+          "nll": 0.0011207639086369824,
+          "brier": 0.00036531229521913333
+        }
+      },
+      "reliability_at_fitted": {
+        "bin_centre": [
+          0.5666666666666667,
+          0.6333333333333333,
+          0.7,
+          0.7666666666666666,
+          0.8333333333333334,
+          0.9,
+          0.9666666666666667
+        ],
+        "accuracy": [
+          0.6666666666666666,
+          0.5,
+          1.0,
+          1.0,
+          0.5,
+          0.75,
+          1.0
+        ],
+        "confidence": [
+          0.5657323315125203,
+          0.6316481162530467,
+          0.7223240823737276,
+          0.7780869164561947,
+          0.8322802943600616,
+          0.8987572880750544,
+          0.9998780024369801
+        ],
+        "count": [
+          3,
+          2,
+          2,
+          1,
+          6,
+          8,
+          8124
+        ],
+        "bins": 15,
+        "n": 8146
+      }
+    },
+    "test": {
+      "fitted_temperature": 0.7723200428507138,
+      "at_fitted_temperature": {
+        "temperature": 1.0,
+        "accuracy": 0.999754480726737,
+        "ece": 0.00040022361841028447,
+        "signed_calibration_error": -0.0002621330425931189,
+        "maximum_calibration_error": 0.5624429153033151,
+        "nll": 0.0009937988086873434,
+        "brier": 0.00021235901608006452,
+        "mean_confidence": 0.9994923476841436,
+        "n": 8146
+      },
+      "raw_at_unit_temperature": {
+        "temperature": 1.0,
+        "accuracy": 0.999754480726737,
+        "ece": 0.0008471514813773473,
+        "signed_calibration_error": -0.0006862389177964305,
+        "maximum_calibration_error": 0.5483276600635736,
+        "nll": 0.0013492264030068048,
+        "brier": 0.00024868762293782246,
+        "mean_confidence": 0.9990682418089407,
+        "n": 8146
+      },
+      "sweep": {
+        "0.3": {
+          "temperature": 0.3,
+          "accuracy": 0.999754480726737,
+          "ece": 0.00020323569866765635,
+          "signed_calibration_error": 0.00018553205492975446,
+          "maximum_calibration_error": 0.6978206827662528,
+          "nll": 0.0015140756266770739,
+          "brier": 0.0001836696935241028,
+          "mean_confidence": 0.9999400127816668,
+          "n": 8146
+        },
+        "0.5": {
+          "temperature": 0.5,
+          "accuracy": 0.999754480726737,
+          "ece": 0.00023227709698457884,
+          "signed_calibration_error": 0.00010838459455885392,
+          "maximum_calibration_error": 0.6229679643552092,
+          "nll": 0.0010220043496964816,
+          "brier": 0.00017944653470109106,
+          "mean_confidence": 0.9998628653212959,
+          "n": 8146
+        },
+        "1": {
+          "temperature": 1.0,
+          "accuracy": 0.999754480726737,
+          "ece": 0.00040022361841028447,
+          "signed_calibration_error": -0.0002621330425931189,
+          "maximum_calibration_error": 0.5624429153033151,
+          "nll": 0.0009937988086873434,
+          "brier": 0.00021235901608006452,
+          "mean_confidence": 0.9994923476841436,
+          "n": 8146
+        },
+        "2": {
+          "temperature": 2.0,
+          "accuracy": 0.999754480726737,
+          "ece": 0.003049513188058289,
+          "signed_calibration_error": -0.0029190579578908357,
+          "maximum_calibration_error": 0.5313441524720379,
+          "nll": 0.0035794905517695986,
+          "brier": 0.0004160266325805054,
+          "mean_confidence": 0.9968354227688462,
+          "n": 8146
+        },
+        "3": {
+          "temperature": 3.0,
+          "accuracy": 0.999754480726737,
+          "ece": 0.011089662791639102,
+          "signed_calibration_error": -0.010961769019487916,
+          "maximum_calibration_error": 0.5209113339717756,
+          "nll": 0.011900496879681931,
+          "brier": 0.0009979648319764622,
+          "mean_confidence": 0.9887927117072491,
+          "n": 8146
+        },
+        "4": {
+          "temperature": 4.0,
+          "accuracy": 0.999754480726737,
+          "ece": 0.02583919974354116,
+          "signed_calibration_error": -0.02571258852240485,
+          "maximum_calibration_error": 0.515687503688194,
+          "nll": 0.027353725012403865,
+          "brier": 0.002283104080533922,
+          "mean_confidence": 0.9740418922043321,
+          "n": 8146
+        }
+      },
+      "sweep_is_relative_to_fitted_temperature": true,
+      "per_class_at_fitted": {
+        "0": {
+          "n": 2248,
+          "signed_calibration_error": -0.0009574424189406085,
+          "maximum_calibration_error": 0.2992310974888279,
+          "nll": 0.001020347467600643,
+          "brier": 0.00010846256102305918
+        },
+        "1": {
+          "n": 5898,
+          "signed_calibration_error": 2.881450121059261e-06,
+          "maximum_calibration_error": 0.5624429153033151,
+          "nll": 0.0009836798895220165,
+          "brier": 0.0002519587500522836
+        }
+      },
+      "reliability_at_fitted": {
+        "bin_centre": [
+          0.5666666666666667,
+          0.7,
+          0.7666666666666666,
+          0.8333333333333334,
+          0.9,
+          0.9666666666666667
+        ],
+        "accuracy": [
+          0.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          0.9998770138974296
+        ],
+        "confidence": [
+          0.5624429153033151,
+          0.6917584982326774,
+          0.7663858046315231,
+          0.8380059045888258,
+          0.8967962611553603,
+          0.9998271234992191
+        ],
+        "count": [
+          1,
+          2,
+          2,
+          3,
+          7,
+          8131
+        ],
+        "bins": 15,
+        "n": 8146
+      }
+    },
+    "shift": {
+      "fitted_temperature": 0.7723200428507138,
+      "at_fitted_temperature": {
+        "temperature": 1.0,
+        "accuracy": 0.8035592060232717,
+        "ece": 0.13760501415097515,
+        "signed_calibration_error": 0.13760501415097515,
+        "maximum_calibration_error": 0.28445206871037165,
+        "nll": 0.8056596711032734,
+        "brier": 0.1625485386787356,
+        "mean_confidence": 0.941164220174247,
+        "n": 2922
+      },
+      "raw_at_unit_temperature": {
+        "temperature": 1.0,
+        "accuracy": 0.8035592060232717,
+        "ece": 0.1217106681385966,
+        "signed_calibration_error": 0.12171066813859661,
+        "maximum_calibration_error": 0.22549205905065595,
+        "nll": 0.6572622565205491,
+        "brier": 0.1562013274650502,
+        "mean_confidence": 0.9252698741618682,
+        "n": 2922
+      },
+      "sweep": {
+        "0.3": {
+          "temperature": 0.3,
+          "accuracy": 0.8035592060232717,
+          "ece": 0.17706079467886587,
+          "signed_calibration_error": 0.17706079467886587,
+          "maximum_calibration_error": 0.40356979975050467,
+          "nll": 2.2917156271132217,
+          "brier": 0.182885589789178,
+          "mean_confidence": 0.9806200007021378,
+          "n": 2922
+        },
+        "0.5": {
+          "temperature": 0.5,
+          "accuracy": 0.8035592060232717,
+          "ece": 0.1657585557615946,
+          "signed_calibration_error": 0.1657585557615946,
+          "maximum_calibration_error": 0.27669460654676514,
+          "nll": 1.4904290444220771,
+          "brier": 0.17640886466946923,
+          "mean_confidence": 0.9693177617848663,
+          "n": 2922
+        },
+        "1": {
+          "temperature": 1.0,
+          "accuracy": 0.8035592060232717,
+          "ece": 0.13760501415097515,
+          "signed_calibration_error": 0.13760501415097515,
+          "maximum_calibration_error": 0.28445206871037165,
+          "nll": 0.8056596711032734,
+          "brier": 0.1625485386787356,
+          "mean_confidence": 0.941164220174247,
+          "n": 2922
+        },
+        "2": {
+          "temperature": 2.0,
+          "accuracy": 0.8035592060232717,
+          "ece": 0.0863263881957638,
+          "signed_calibration_error": 0.08620413966691114,
+          "maximum_calibration_error": 0.163510558182417,
+          "nll": 0.4998581480606988,
+          "brier": 0.1454146250734322,
+          "mean_confidence": 0.8897633456901828,
+          "n": 2922
+        },
+        "3": {
+          "temperature": 3.0,
+          "accuracy": 0.8035592060232717,
+          "ece": 0.04141109072522117,
+          "signed_calibration_error": 0.041411090725221165,
+          "maximum_calibration_error": 0.10908145803102975,
+          "nll": 0.43193864667466103,
+          "brier": 0.13758857145015937,
+          "mean_confidence": 0.844970296748493,
+          "n": 2922
+        },
+        "4": {
+          "temperature": 4.0,
+          "accuracy": 0.8035592060232717,
+          "ece": 0.007966645898269339,
+          "signed_calibration_error": 0.0027993882178154353,
+          "maximum_calibration_error": 0.030219381695914205,
+          "nll": 0.4184672194941588,
+          "brier": 0.1353116450593623,
+          "mean_confidence": 0.8063585942410871,
+          "n": 2922
+        }
+      },
+      "sweep_is_relative_to_fitted_temperature": true,
+      "per_class_at_fitted": {
+        "0": {
+          "n": 823,
+          "signed_calibration_error": 0.31495856838834746,
+          "maximum_calibration_error": 0.38417414699733266,
+          "nll": 1.9950205635299838,
+          "brier": 0.34908786986571233
+        },
+        "1": {
+          "n": 2099,
+          "signed_calibration_error": 0.06806619798262954,
+          "maximum_calibration_error": 0.3580831279336189,
+          "nll": 0.3393214078983271,
+          "brier": 0.08940805770356557
+        }
+      },
+      "reliability_at_fitted": {
+        "bin_centre": [
+          0.5,
+          0.5666666666666667,
+          0.6333333333333333,
+          0.7,
+          0.7666666666666666,
+          0.8333333333333334,
+          0.9,
+          0.9666666666666667
+        ],
+        "accuracy": [
+          0.4583333333333333,
+          0.5333333333333333,
+          0.5178571428571429,
+          0.5671641791044776,
+          0.6597938144329897,
+          0.553030303030303,
+          0.6648351648351648,
+          0.8657836644591611
+        ],
+        "confidence": [
+          0.5180945856985949,
+          0.5708457105138548,
+          0.6321313107368832,
+          0.7015113449757109,
+          0.7695304727660763,
+          0.8374823717406746,
+          0.903590397418659,
+          0.9935336371629868
+        ],
+        "count": [
+          48,
+          75,
+          56,
+          67,
+          97,
+          132,
+          182,
+          2265
+        ],
+        "bins": 15,
+        "n": 2922
+      }
+    }
+  }
+}

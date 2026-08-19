@@ -124,7 +124,32 @@ ways, not two:
 | --- | --- | --- |
 | `train` | remainder | fine-tuning |
 | `val` | `val_fraction` = 0.15 | fits the temperature, and nothing else |
-| `test` | `test_fraction` = 0.15 | early stopping, model selection, and the reported in-distribution accuracy that becomes BASE_ACC |
+| `test` | `test_fraction` = 0.15 | early stopping, model selection, and the reported in-distribution accuracy |
+
+#### BASE_ACC — settled 19 August 2026
+
+**BASE_ACC = 0.8036, the PlantDoc shift accuracy.** Not the 0.9998 measured on the
+PlantVillage `test` split, which an earlier draft of the row above assigned to the role.
+Three reasons, in order of weight:
+
+1. **It is the accuracy the sweep actually runs at.** `configs/sweep.yaml` sets
+   `pool_split: shift`, so every planner number in `docs/RESULTS.md` was produced against a
+   classifier operating at 0.8036. A BASE_ACC drawn from a split the experiment does not
+   use would describe nothing that was measured.
+2. **The in-distribution condition is degenerate for this study's question.** At 0.9998
+   accuracy and ECE 0.0004, a false positive essentially cannot occur at τ = 0.75 —
+   measured PPO precision is exactly 1.000 and false alarms exactly 0, on every episode of
+   every seed. The precision-for-recall trade this study exists to measure is unmeasurable
+   there. Its swept ECE range, 0.0002–0.0258, is also an order of magnitude below the
+   pilot's 0.0037–0.1980.
+3. **It keeps the two phases comparable.** The pilot pinned BASE_ACC at 0.816 from Ahmad et
+   al. (2023). 0.8036 sits beside it, so a difference between the phases is attributable to
+   the classifier rather than to a change of operating point.
+
+The `test` split is therefore the **control** condition: it establishes that the
+temperature instrument works on a real network — accuracy invariant to six decimal places —
+and that the model is well calibrated where it was trained. It is not the experimental
+condition, and its accuracy is not BASE_ACC.
 
 ### Calibration
 

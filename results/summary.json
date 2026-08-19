@@ -1,0 +1,1868 @@
+{
+  "cells": {
+    "greedy_entropy@T0.3": {
+      "agent": "greedy_entropy",
+      "temperature": 0.3,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.07379080988816472,
+        "ci_low": 0.06158155677435038,
+        "ci_high": 0.08165172974582653,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.2833903017154597,
+        "ci_low": 0.27756022090558297,
+        "ci_high": 0.2941594076430311,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.29023343433822996,
+        "ci_low": 0.2484649077489084,
+        "ci_high": 0.31763924752424466,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.31156141493055556,
+        "ci_low": 0.3095052083333334,
+        "ci_high": 0.3126845974392361,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 112.60555555555555,
+        "ci_low": 109.81097222222223,
+        "ci_high": 116.33388888888888,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 13.63888888888889,
+        "ci_low": 9.883333333333333,
+        "ci_high": 17.577777777777776,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "greedy_entropy@T0.5": {
+      "agent": "greedy_entropy",
+      "temperature": 0.5,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.06947037785026561,
+        "ci_low": 0.06101465794990224,
+        "ci_high": 0.07693329521805593,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.27875855507661024,
+        "ci_low": 0.2692246764089908,
+        "ci_high": 0.288805628768809,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.28282867694199243,
+        "ci_low": 0.2536823597783686,
+        "ci_high": 0.3091216322785536,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.2963758680555556,
+        "ci_low": 0.2948187934027778,
+        "ci_high": 0.298269314236111,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 109.71666666666667,
+        "ci_low": 107.46111111111111,
+        "ci_high": 112.38374999999999,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 9.216666666666669,
+        "ci_low": 6.966666666666667,
+        "ci_high": 12.133333333333333,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "greedy_entropy@T1": {
+      "agent": "greedy_entropy",
+      "temperature": 1.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.06123061846742834,
+        "ci_low": 0.05050786993360723,
+        "ci_high": 0.06930260675311611,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.2378201930809674,
+        "ci_low": 0.22839956097665862,
+        "ci_high": 0.24638784484072948,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.2729292838392039,
+        "ci_low": 0.23033550481287796,
+        "ci_high": 0.3033200868395646,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.24835069444444446,
+        "ci_low": 0.24602864583333328,
+        "ci_high": 0.2507813856336806,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 101.28888888888889,
+        "ci_low": 99.97222222222223,
+        "ci_high": 104.1223611111111,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 14.455555555555556,
+        "ci_low": 8.93875,
+        "ci_high": 21.117083333333326,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "greedy_entropy@T2": {
+      "agent": "greedy_entropy",
+      "temperature": 2.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.04754689434934825,
+        "ci_low": 0.03839609839042016,
+        "ci_high": 0.055649344158728103,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.18603661851334163,
+        "ci_low": 0.17474917217087232,
+        "ci_high": 0.2005787295198401,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.22053827143506913,
+        "ci_low": 0.18233029619681557,
+        "ci_high": 0.252969676970562,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.19548068576388886,
+        "ci_low": 0.19438476562500004,
+        "ci_high": 0.19694023980034722,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 104.72777777777777,
+        "ci_low": 102.77222222222221,
+        "ci_high": 107.38888888888889,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 22.46111111111111,
+        "ci_low": 12.0,
+        "ci_high": 35.033472222222215,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "greedy_entropy@T3": {
+      "agent": "greedy_entropy",
+      "temperature": 3.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.04345371285291863,
+        "ci_low": 0.03720591679194219,
+        "ci_high": 0.047897502959389535,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.1707460730121702,
+        "ci_low": 0.16472781341473489,
+        "ci_high": 0.17509931760626635,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.19498578246602336,
+        "ci_low": 0.16876186400999962,
+        "ci_high": 0.21368738816073288,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.16941189236111112,
+        "ci_low": 0.16834309895833333,
+        "ci_high": 0.1704861111111111,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 112.78888888888889,
+        "ci_low": 110.86652777777778,
+        "ci_high": 115.11111111111111,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 24.933333333333334,
+        "ci_low": 18.38888888888889,
+        "ci_high": 32.36694444444444,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "greedy_entropy@T4": {
+      "agent": "greedy_entropy",
+      "temperature": 4.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.041049183059942644,
+        "ci_low": 0.03429534094219288,
+        "ci_high": 0.046716220206433255,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.16221142723640689,
+        "ci_low": 0.15232956600549027,
+        "ci_high": 0.1711887956697978,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.1790282580572589,
+        "ci_low": 0.15132771365527564,
+        "ci_high": 0.2022786220034281,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.157421875,
+        "ci_low": 0.15603298611111113,
+        "ci_high": 0.15844726562500003,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 118.71666666666667,
+        "ci_low": 116.61666666666669,
+        "ci_high": 120.9388888888889,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 23.261111111111113,
+        "ci_low": 15.450000000000001,
+        "ci_high": 34.78333333333333,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "lawnmower@T0.3": {
+      "agent": "lawnmower",
+      "temperature": 0.3,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.09095655806182054,
+        "ci_low": 0.07799794625452462,
+        "ci_high": 0.10086849067112151,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.3563901228278838,
+        "ci_low": 0.35114940278562773,
+        "ci_high": 0.36025737341682995,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.31250819405776015,
+        "ci_low": 0.2742648635498954,
+        "ci_high": 0.34064981961425417,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.390625,
+        "ci_low": 0.390625,
+        "ci_high": 0.390625,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 124.42777777777779,
+        "ci_low": 121.57777777777778,
+        "ci_high": 128.13347222222222,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 9.922222222222222,
+        "ci_low": 8.044444444444444,
+        "ci_high": 13.177777777777777,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "lawnmower@T0.5": {
+      "agent": "lawnmower",
+      "temperature": 0.5,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.0902777777777771,
+        "ci_low": 0.07747559001670787,
+        "ci_high": 0.1000591757170697,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.3538334144345414,
+        "ci_low": 0.3491513396256377,
+        "ci_high": 0.3574408875453336,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.3216943789381603,
+        "ci_low": 0.2824489333759706,
+        "ci_high": 0.35050007149349366,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.390625,
+        "ci_low": 0.390625,
+        "ci_high": 0.390625,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 118.09999999999998,
+        "ci_low": 115.43319444444445,
+        "ci_high": 121.57249999999998,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 9.922222222222222,
+        "ci_low": 8.044444444444444,
+        "ci_high": 13.255555555555555,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "lawnmower@T1": {
+      "agent": "lawnmower",
+      "temperature": 1.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.08697089947089881,
+        "ci_low": 0.07457880813143916,
+        "ci_high": 0.09635242620439916,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.3411404351096788,
+        "ci_low": 0.33674046656415757,
+        "ci_high": 0.34445182315340644,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.3433248884982967,
+        "ci_low": 0.30265592646153966,
+        "ci_high": 0.37326512173363374,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.390625,
+        "ci_low": 0.390625,
+        "ci_high": 0.390625,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 102.85000000000001,
+        "ci_low": 100.76097222222222,
+        "ci_high": 105.73902777777776,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 10.36111111111111,
+        "ci_low": 8.244444444444445,
+        "ci_high": 14.244583333333331,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "lawnmower@T2": {
+      "agent": "lawnmower",
+      "temperature": 2.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.0809227930938451,
+        "ci_low": 0.06958281119465279,
+        "ci_high": 0.08959899749373365,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.318463457470528,
+        "ci_low": 0.3143456990618109,
+        "ci_high": 0.32177533381953627,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.3754383222105587,
+        "ci_low": 0.3326321069886195,
+        "ci_high": 0.4070862958248595,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.390625,
+        "ci_low": 0.390625,
+        "ci_high": 0.390625,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 83.09444444444445,
+        "ci_low": 81.22763888888889,
+        "ci_high": 85.22777777777776,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 10.983333333333333,
+        "ci_low": 8.744444444444444,
+        "ci_high": 14.989027777777777,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "lawnmower@T3": {
+      "agent": "lawnmower",
+      "temperature": 3.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.07457880813143916,
+        "ci_low": 0.06425786688944538,
+        "ci_high": 0.08254142300194871,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.2943480424686088,
+        "ci_low": 0.2907369122183534,
+        "ci_high": 0.2968372134149727,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.4173682546048374,
+        "ci_low": 0.37283302231755094,
+        "ci_high": 0.4501376120032331,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.390625,
+        "ci_low": 0.390625,
+        "ci_high": 0.390625,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 63.833333333333336,
+        "ci_low": 62.48888888888889,
+        "ci_high": 65.52777777777777,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 11.916666666666666,
+        "ci_low": 9.172222222222224,
+        "ci_high": 15.649999999999999,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "lawnmower@T4": {
+      "agent": "lawnmower",
+      "temperature": 4.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.06834795321637376,
+        "ci_low": 0.058870701058200615,
+        "ci_high": 0.07555390211640155,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.26960197422950677,
+        "ci_low": 0.2666323105343362,
+        "ci_high": 0.27194786658279246,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.48332559661201,
+        "ci_low": 0.43713879592501204,
+        "ci_high": 0.5172537116124103,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.390625,
+        "ci_low": 0.390625,
+        "ci_high": 0.390625,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 44.38333333333334,
+        "ci_low": 43.711111111111116,
+        "ci_high": 45.46666666666667,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 12.794444444444444,
+        "ci_low": 9.833194444444446,
+        "ci_high": 16.750138888888888,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "oracle@T0.3": {
+      "agent": "oracle",
+      "temperature": 0.3,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.24970787825026022,
+        "ci_low": 0.21491217574197233,
+        "ci_high": 0.26998011844600817,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.9876317043879383,
+        "ci_low": 0.9746196416476257,
+        "ci_high": 0.9969474656862278,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.780166415763211,
+        "ci_low": 0.7714977044895776,
+        "ci_high": 0.7893939354673172,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.26142578125000004,
+        "ci_low": 0.22792209201388888,
+        "ci_high": 0.287424045138889,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 42.333333333333336,
+        "ci_low": 37.74444444444444,
+        "ci_high": 47.022222222222226,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 1.6222222222222222,
+        "ci_low": 1.3666666666666667,
+        "ci_high": 1.9833333333333332,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "oracle@T0.5": {
+      "agent": "oracle",
+      "temperature": 0.5,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.24875956822581122,
+        "ci_low": 0.21455776472597532,
+        "ci_high": 0.2687941456262224,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.9862939294747277,
+        "ci_low": 0.9724490526336317,
+        "ci_high": 0.9968345515906579,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.7892789329864118,
+        "ci_low": 0.7823148647509879,
+        "ci_high": 0.7979412405797922,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.2613932291666667,
+        "ci_low": 0.22809014214409723,
+        "ci_high": 0.2863389756944444,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 39.95,
+        "ci_low": 35.08875,
+        "ci_high": 44.87222222222222,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 1.7000000000000002,
+        "ci_low": 1.4944444444444445,
+        "ci_high": 1.9555555555555557,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "oracle@T1": {
+      "agent": "oracle",
+      "temperature": 1.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.24782681700296003,
+        "ci_low": 0.21420464051408158,
+        "ci_high": 0.2670959296650549,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.983659594960079,
+        "ci_low": 0.9676545018042225,
+        "ci_high": 0.9955445765999167,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.8044898669848577,
+        "ci_low": 0.7977389054408904,
+        "ci_high": 0.815035819709606,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.26204969618055557,
+        "ci_low": 0.23022148980034726,
+        "ci_high": 0.28495551215277776,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 35.73888888888889,
+        "ci_low": 32.138888888888886,
+        "ci_high": 39.77777777777778,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 1.8833333333333333,
+        "ci_low": 1.6833333333333331,
+        "ci_high": 2.0500000000000003,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "oracle@T2": {
+      "agent": "oracle",
+      "temperature": 2.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.24444073420417667,
+        "ci_low": 0.21290316266592763,
+        "ci_high": 0.26211617651862756,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.9735329712904215,
+        "ci_low": 0.9513331314527819,
+        "ci_high": 0.9917868629471134,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.8301461332876303,
+        "ci_low": 0.8258824408042853,
+        "ci_high": 0.835016206933311,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.26170789930555555,
+        "ci_low": 0.23077690972222223,
+        "ci_high": 0.2832850477430555,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 30.45555555555556,
+        "ci_low": 27.116666666666664,
+        "ci_high": 33.61666666666667,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 1.8166666666666669,
+        "ci_low": 1.5222222222222221,
+        "ci_high": 2.1277777777777778,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "oracle@T3": {
+      "agent": "oracle",
+      "temperature": 3.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.24054949385563645,
+        "ci_low": 0.2110199813845738,
+        "ci_high": 0.2570875065455416,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.9639788337637706,
+        "ci_low": 0.9376274937897215,
+        "ci_high": 0.9870162124116766,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.8511985855251181,
+        "ci_low": 0.8468483772590093,
+        "ci_high": 0.856258405581564,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.2601345486111111,
+        "ci_low": 0.23142361111111112,
+        "ci_high": 0.28011094835069444,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 25.383333333333333,
+        "ci_low": 23.127777777777776,
+        "ci_high": 27.766666666666666,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 1.8666666666666667,
+        "ci_low": 1.6388888888888888,
+        "ci_high": 2.1833333333333336,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "oracle@T4": {
+      "agent": "oracle",
+      "temperature": 4.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.23636047486077924,
+        "ci_low": 0.20941849456452105,
+        "ci_high": 0.2501167179344896,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.9481654723133681,
+        "ci_low": 0.9129248241213618,
+        "ci_high": 0.98101821449363,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.8772168979514876,
+        "ci_low": 0.8736324457759725,
+        "ci_high": 0.8809621810718687,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.2575086805555556,
+        "ci_low": 0.2318358018663194,
+        "ci_high": 0.27540690104166665,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 20.18888888888889,
+        "ci_low": 18.08875,
+        "ci_high": 22.094583333333336,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 2.272222222222222,
+        "ci_low": 1.9722222222222223,
+        "ci_high": 2.5555555555555554,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "ppo@T0.3": {
+      "agent": "ppo",
+      "temperature": 0.3,
+      "n_runs": 45,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.08715931013938205,
+        "ci_low": 0.0799392448779696,
+        "ci_high": 0.09196621830873362,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.34018182558479476,
+        "ci_low": 0.3361309061217728,
+        "ci_high": 0.34383017274895905,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.33835230972031044,
+        "ci_low": 0.3155156762467634,
+        "ci_high": 0.35396762888934713,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.32799337635869563,
+        "ci_low": 0.326704685377038,
+        "ci_high": 0.3294412364130435,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 107.20652173913045,
+        "ci_low": 105.93684782608696,
+        "ci_high": 108.77396739130437,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 9.206521739130435,
+        "ci_low": 7.77608695652174,
+        "ci_high": 10.891304347826088,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "ppo@T0.5": {
+      "agent": "ppo",
+      "temperature": 0.5,
+      "n_runs": 45,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.08605799142950409,
+        "ci_low": 0.07986144797576082,
+        "ci_high": 0.09063989834675579,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.33938518586508065,
+        "ci_low": 0.3340192841535607,
+        "ci_high": 0.34509143804239906,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.34516742785292,
+        "ci_low": 0.32439119369679587,
+        "ci_high": 0.36011591252462366,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.32944123641304346,
+        "ci_low": 0.3278214164402174,
+        "ci_high": 0.3308402683423913,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 103.17391304347828,
+        "ci_low": 102.03043478260871,
+        "ci_high": 104.47179347826086,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 9.167391304347827,
+        "ci_low": 7.76304347826087,
+        "ci_high": 10.869619565217391,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "ppo@T1": {
+      "agent": "ppo",
+      "temperature": 1.0,
+      "n_runs": 45,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.08477686837143084,
+        "ci_low": 0.07810529602451505,
+        "ci_high": 0.08907289798629228,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.3311247961275829,
+        "ci_low": 0.3251336024171665,
+        "ci_high": 0.33629206309868337,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.37044364522509116,
+        "ci_low": 0.34717697463044905,
+        "ci_high": 0.384658540573218,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.3252462635869565,
+        "ci_low": 0.3237176779042119,
+        "ci_high": 0.3263290272588315,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 91.17608695652174,
+        "ci_low": 90.28255434782609,
+        "ci_high": 92.24347826086957,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 8.919565217391305,
+        "ci_low": 7.7239130434782615,
+        "ci_high": 10.513097826086957,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "ppo@T2": {
+      "agent": "ppo",
+      "temperature": 2.0,
+      "n_runs": 45,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.07833561763298488,
+        "ci_low": 0.0726960291727643,
+        "ci_high": 0.082277969364815,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.306845878853415,
+        "ci_low": 0.30278556237432624,
+        "ci_high": 0.3115767529485084,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.3885540943606435,
+        "ci_low": 0.36749619893934937,
+        "ci_high": 0.40369210813397965,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.3231869904891304,
+        "ci_low": 0.322012939453125,
+        "ci_high": 0.32432702105978256,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 77.09347826086957,
+        "ci_low": 76.15434782608695,
+        "ci_high": 78.09565217391305,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 9.736956521739131,
+        "ci_low": 8.671684782608695,
+        "ci_high": 11.010978260869564,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "ppo@T3": {
+      "agent": "ppo",
+      "temperature": 3.0,
+      "n_runs": 45,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.07196864505449083,
+        "ci_low": 0.06669069984530208,
+        "ci_high": 0.07538923142448356,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.28308501534057684,
+        "ci_low": 0.27823424251962503,
+        "ci_high": 0.28706843583167796,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.4111633418647633,
+        "ci_low": 0.388855169562244,
+        "ci_high": 0.42710987871869105,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.3235160495923913,
+        "ci_low": 0.3228069802989131,
+        "ci_high": 0.32418483568274464,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 64.00434782608694,
+        "ci_low": 63.33260869565217,
+        "ci_high": 64.7370108695652,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 10.608695652173912,
+        "ci_low": 8.80211956521739,
+        "ci_high": 12.780434782608697,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "ppo@T4": {
+      "agent": "ppo",
+      "temperature": 4.0,
+      "n_runs": 45,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.06625966739665826,
+        "ci_low": 0.06158707795739296,
+        "ci_high": 0.06931703499747671,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.2606559212151204,
+        "ci_low": 0.2567665440717066,
+        "ci_high": 0.2647216437023033,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.4514852978951027,
+        "ci_low": 0.4297381798488049,
+        "ci_high": 0.4657657589800798,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.32100883152173915,
+        "ci_low": 0.32026791779891295,
+        "ci_high": 0.3218474014945652,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 50.54130434782609,
+        "ci_low": 50.03478260869565,
+        "ci_high": 51.15440217391305,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 10.369565217391303,
+        "ci_low": 9.112989130434782,
+        "ci_high": 11.791358695652175,
+        "n": 45,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "random@T0.3": {
+      "agent": "random",
+      "temperature": 0.3,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.03906972714690384,
+        "ci_low": 0.033300715860264535,
+        "ci_high": 0.043699950541581545,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.15694057219237822,
+        "ci_low": 0.15417878951629857,
+        "ci_high": 0.1595831527490322,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.24872230902689965,
+        "ci_low": 0.21576168837438223,
+        "ci_high": 0.2751502717193649,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.16443684895833335,
+        "ci_low": 0.16443684895833335,
+        "ci_high": 0.16443684895833335,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 73.20555555555556,
+        "ci_low": 71.88888888888887,
+        "ci_high": 75.1111111111111,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 22.544444444444444,
+        "ci_low": 14.277777777777779,
+        "ci_high": 32.21708333333333,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "random@T0.5": {
+      "agent": "random",
+      "temperature": 0.5,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.03890461289674799,
+        "ci_low": 0.03322734681156425,
+        "ci_high": 0.04348643913617099,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.15636828279225656,
+        "ci_low": 0.15352560780080746,
+        "ci_high": 0.15912231306044836,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.25833524319973156,
+        "ci_low": 0.22492407665657543,
+        "ci_high": 0.28502938305552283,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.16443684895833335,
+        "ci_low": 0.16443684895833335,
+        "ci_high": 0.16443684895833335,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 69.10555555555555,
+        "ci_low": 67.93888888888888,
+        "ci_high": 70.90555555555557,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 22.544444444444444,
+        "ci_low": 14.277777777777779,
+        "ci_high": 32.21708333333333,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "random@T1": {
+      "agent": "random",
+      "temperature": 1.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.038365838747482145,
+        "ci_low": 0.03277828032958954,
+        "ci_high": 0.042894012136963,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.15391275431466817,
+        "ci_low": 0.15127257074099032,
+        "ci_high": 0.15668448678987695,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.2618421161489583,
+        "ci_low": 0.2280919299962108,
+        "ci_high": 0.28878585786464134,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.16443684895833335,
+        "ci_low": 0.16443684895833335,
+        "ci_high": 0.16443684895833335,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 66.69444444444444,
+        "ci_low": 65.57222222222222,
+        "ci_high": 68.40027777777777,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 23.13888888888889,
+        "ci_low": 14.910833333333334,
+        "ci_high": 32.544444444444444,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "random@T2": {
+      "agent": "random",
+      "temperature": 2.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.03734031670783384,
+        "ci_low": 0.03185569450768784,
+        "ci_high": 0.04182867962968491,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.15003696371122116,
+        "ci_low": 0.14690535992250336,
+        "ci_high": 0.15278461553714445,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.25611809449584005,
+        "ci_low": 0.22262261842193315,
+        "ci_high": 0.28208595414459525,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.16443684895833335,
+        "ci_low": 0.16443684895833335,
+        "ci_high": 0.16443684895833335,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 67.13333333333333,
+        "ci_low": 66.07777777777777,
+        "ci_high": 68.67777777777779,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 23.52777777777778,
+        "ci_low": 15.41111111111111,
+        "ci_high": 33.166666666666664,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "random@T3": {
+      "agent": "random",
+      "temperature": 3.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.03618432786009432,
+        "ci_low": 0.03090834071540749,
+        "ci_high": 0.04056437059330481,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.14556822153012441,
+        "ci_low": 0.14291904499587457,
+        "ci_high": 0.14812611163546505,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.24886129924968733,
+        "ci_low": 0.21638701396423143,
+        "ci_high": 0.2747376976812974,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.16443684895833335,
+        "ci_low": 0.16443684895833335,
+        "ci_high": 0.16443684895833335,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 67.71111111111112,
+        "ci_low": 66.52222222222223,
+        "ci_high": 69.33347222222223,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 24.63888888888889,
+        "ci_low": 16.627777777777776,
+        "ci_high": 33.883333333333326,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    },
+    "random@T4": {
+      "agent": "random",
+      "temperature": 4.0,
+      "n_runs": 15,
+      "detections_per_joule": {
+        "estimator": "iqm",
+        "value": 0.03500238466617041,
+        "ci_low": 0.029925380437999277,
+        "ci_high": 0.03927818894741247,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "recall": {
+        "estimator": "iqm",
+        "value": 0.1413329284588977,
+        "ci_low": 0.13891444763447797,
+        "ci_high": 0.143822392549865,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "precision": {
+        "estimator": "iqm",
+        "value": 0.242546816514101,
+        "ci_low": 0.21110239275652765,
+        "ci_high": 0.26772580724832046,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "coverage": {
+        "estimator": "iqm",
+        "value": 0.16443684895833335,
+        "ci_low": 0.16443684895833335,
+        "ci_high": 0.16443684895833335,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "false_alarms": {
+        "estimator": "iqm",
+        "value": 67.90555555555555,
+        "ci_low": 66.73333333333333,
+        "ci_high": 69.53888888888888,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "time_to_first_detection": {
+        "estimator": "iqm",
+        "value": 25.950000000000003,
+        "ci_low": 18.038611111111113,
+        "ci_high": 34.578055555555544,
+        "n": 15,
+        "ci_stratified_by": "seed"
+      },
+      "ece": null,
+      "signed_calibration_error": null,
+      "accuracy": null
+    }
+  },
+  "agents": [
+    "greedy_entropy",
+    "lawnmower",
+    "oracle",
+    "ppo",
+    "random"
+  ],
+  "temperatures": [
+    0.3,
+    0.5,
+    1.0,
+    2.0,
+    3.0,
+    4.0
+  ],
+  "degradation": {
+    "greedy_entropy": {
+      "T1": 0.06123061846742834,
+      "T4": 0.041049183059942644,
+      "ratio": 1.4916403665820943,
+      "probability_of_improvement_T1_over_T4": 0.8311111111111111
+    },
+    "lawnmower": {
+      "T1": 0.08697089947089881,
+      "T4": 0.06834795321637376,
+      "ratio": 1.2724726254138017,
+      "probability_of_improvement_T1_over_T4": 0.7777777777777778
+    },
+    "oracle": {
+      "T1": 0.24782681700296003,
+      "T4": 0.23636047486077924,
+      "ratio": 1.0485120964024746,
+      "probability_of_improvement_T1_over_T4": 0.7244444444444444
+    },
+    "ppo": {
+      "T1": 0.08477686837143084,
+      "T4": 0.06625966739665826,
+      "ratio": 1.2794641401370281,
+      "probability_of_improvement_T1_over_T4": 0.8034567901234568
+    },
+    "random": {
+      "T1": 0.038365838747482145,
+      "T4": 0.03500238466617041,
+      "ratio": 1.0960921409609699,
+      "probability_of_improvement_T1_over_T4": 0.6133333333333333
+    }
+  },
+  "rankings": {
+    "T0.3": [
+      {
+        "agent": "oracle",
+        "detections_per_joule": 0.24970787825026022
+      },
+      {
+        "agent": "lawnmower",
+        "detections_per_joule": 0.09095655806182054
+      },
+      {
+        "agent": "ppo",
+        "detections_per_joule": 0.08715931013938205
+      },
+      {
+        "agent": "greedy_entropy",
+        "detections_per_joule": 0.07379080988816472
+      },
+      {
+        "agent": "random",
+        "detections_per_joule": 0.03906972714690384
+      }
+    ],
+    "T0.5": [
+      {
+        "agent": "oracle",
+        "detections_per_joule": 0.24875956822581122
+      },
+      {
+        "agent": "lawnmower",
+        "detections_per_joule": 0.0902777777777771
+      },
+      {
+        "agent": "ppo",
+        "detections_per_joule": 0.08605799142950409
+      },
+      {
+        "agent": "greedy_entropy",
+        "detections_per_joule": 0.06947037785026561
+      },
+      {
+        "agent": "random",
+        "detections_per_joule": 0.03890461289674799
+      }
+    ],
+    "T1": [
+      {
+        "agent": "oracle",
+        "detections_per_joule": 0.24782681700296003
+      },
+      {
+        "agent": "lawnmower",
+        "detections_per_joule": 0.08697089947089881
+      },
+      {
+        "agent": "ppo",
+        "detections_per_joule": 0.08477686837143084
+      },
+      {
+        "agent": "greedy_entropy",
+        "detections_per_joule": 0.06123061846742834
+      },
+      {
+        "agent": "random",
+        "detections_per_joule": 0.038365838747482145
+      }
+    ],
+    "T2": [
+      {
+        "agent": "oracle",
+        "detections_per_joule": 0.24444073420417667
+      },
+      {
+        "agent": "lawnmower",
+        "detections_per_joule": 0.0809227930938451
+      },
+      {
+        "agent": "ppo",
+        "detections_per_joule": 0.07833561763298488
+      },
+      {
+        "agent": "greedy_entropy",
+        "detections_per_joule": 0.04754689434934825
+      },
+      {
+        "agent": "random",
+        "detections_per_joule": 0.03734031670783384
+      }
+    ],
+    "T3": [
+      {
+        "agent": "oracle",
+        "detections_per_joule": 0.24054949385563645
+      },
+      {
+        "agent": "lawnmower",
+        "detections_per_joule": 0.07457880813143916
+      },
+      {
+        "agent": "ppo",
+        "detections_per_joule": 0.07196864505449083
+      },
+      {
+        "agent": "greedy_entropy",
+        "detections_per_joule": 0.04345371285291863
+      },
+      {
+        "agent": "random",
+        "detections_per_joule": 0.03618432786009432
+      }
+    ],
+    "T4": [
+      {
+        "agent": "oracle",
+        "detections_per_joule": 0.23636047486077924
+      },
+      {
+        "agent": "lawnmower",
+        "detections_per_joule": 0.06834795321637376
+      },
+      {
+        "agent": "ppo",
+        "detections_per_joule": 0.06625966739665826
+      },
+      {
+        "agent": "greedy_entropy",
+        "detections_per_joule": 0.041049183059942644
+      },
+      {
+        "agent": "random",
+        "detections_per_joule": 0.03500238466617041
+      }
+    ]
+  },
+  "n_rows": 630,
+  "source_csv": "results/sweep_results.csv",
+  "estimator": "iqm + stratified bootstrap (Agarwal et al. 2021)"
+}

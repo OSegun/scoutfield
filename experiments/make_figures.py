@@ -198,7 +198,6 @@ def _find_result(name: str):
     ``/kaggle/input``. Looking only locally silently skips the figure and leaves a
     figure set that is quietly missing two panels.
     """
-    from pathlib import Path
 
     from scoutfield.utils.paths import find_artifact
 

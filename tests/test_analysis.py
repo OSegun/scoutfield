@@ -56,6 +56,32 @@ def test_bootstrap_ci_rejects_mismatched_strata():
         stratified_bootstrap_ci(np.zeros(10), np.zeros(4))
 
 
+def test_bootstrap_ci_refuses_singleton_strata():
+    """One observation per stratum cannot be resampled, so it must not be tried.
+
+    Every test above hands the estimator five values per stratum, which is why this
+    went unnoticed: the tau sensitivity analysis ran one job per seed, stratified by
+    seed, and wrote zero-width intervals to results/tau_sensitivity_summary.json for
+    every cell. A silent zero-width interval reports certainty the data does not
+    contain, so it fails loudly now.
+    """
+    values = np.array([1.0, 5.0, 2.0, 9.0, 4.0])
+    strata = np.arange(5)
+    with pytest.raises(ValueError, match="one member"):
+        stratified_bootstrap_ci(values, strata, resamples=200)
+
+
+def test_bootstrap_ci_pooled_fallback_is_not_degenerate():
+    """The opt-in fallback must produce a real interval, not the same collapse."""
+    values = np.array([1.0, 5.0, 2.0, 9.0, 4.0])
+    strata = np.arange(5)
+    lo, hi = stratified_bootstrap_ci(values, strata, resamples=2000,
+                                     allow_unstratified=True,
+                                     rng=np.random.default_rng(0))
+    assert lo < hi, "pooled fallback collapsed to a point"
+    assert lo <= iqm(values) <= hi
+
+
 def test_probability_of_improvement_handles_the_obvious_cases():
     assert probability_of_improvement(np.array([2.0, 3.0]), np.array([0.0, 1.0])) == 1.0
     assert probability_of_improvement(np.array([0.0, 1.0]), np.array([2.0, 3.0])) == 0.0

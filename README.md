@@ -1,18 +1,23 @@
 # scoutfield
 
-**Does a classifier's miscalibration change where a drone should fly?** A PyTorch
-implementation of calibration-aware informative path planning for energy-constrained
-aerial crop scouting.
+**Does a classifier's miscalibration change where a drone should fly?** The implementation
+phase of a completed pilot study — replacing the pilot's synthetic confidence instrument
+with a fine-tuned EfficientNet-B0 and its REINFORCE agent with PPO, to find out whether the
+pilot's effect was real or an artefact of the surrogate.
 
 [![tests](https://github.com/OSegun/scoutfield/actions/workflows/ci.yml/badge.svg)](https://github.com/OSegun/scoutfield/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![pilot](https://img.shields.io/badge/pilot-scoutplan%20v1.0.0-2C5F2D)](https://github.com/OSegun/scoutplan)
 
-> **Status: work in progress. No result in this repository has been measured yet.**
-> The completed pilot study — 195 executed runs, 8 figures, the full write-up — lives
-> in the companion repository [**scoutplan**](https://github.com/OSegun/scoutplan),
-> pinned here at `v1.0.0`.
+> **Status: research in progress, not a finished study.** Seven of the nine roadmap items
+> below have produced measured numbers; two have not. Nothing here has been peer-reviewed,
+> and the headline finding — that the pilot's effect size does **not** reproduce — is a
+> result from one perception model on one dataset pair and should be read that way.
+>
+> The **completed** work is the pilot study: 195 executed runs, 8 figures, a full write-up,
+> frozen in the companion repository [**scoutplan**](https://github.com/OSegun/scoutplan)
+> and pinned here at `v1.0.0`. This repository extends it; it does not replace it.
 
 ---
 
@@ -31,36 +36,111 @@ while confidence does.** Sweep `T`, hold accuracy fixed, and any change in plann
 performance is attributable to calibration alone. That is the whole experimental design,
 and it needs no budget.
 
-## What the pilot found, and what this repo tests
+## Where this repository stands
 
-| Pilot result | Value |
-| --- | --- |
-| Accuracy across all temperatures | 0.8161, invariant to 4 d.p. |
-| ECE swept | 0.0037 (`T`=1) → 0.1980 (`T`=4) |
-| Lawnmower detections/joule collapse | 0.0781 → 0.0058 = **13.4×** |
-| GreedyEntropy degradation | 1.84× |
-| Ranking reversal at `T`=4 | GreedyEntropy beats Lawnmower 7.3× |
+| Roadmap item | State | Evidence |
+| --- | --- | --- |
+| 1. Fine-tune EfficientNet-B0; hold out PlantDoc | measured | 0.9998 test / 0.8036 shift accuracy |
+| 2. `CNNClassifier` behind the pilot's `observe()` | measured | contract tests pass with the CNN swapped in |
+| 3. Temperature sweep on the real classifier | measured | accuracy invariant to 6 d.p. on all splits |
+| 4. `FieldScoutEnv`: 32×32, ≤40% coverage | measured | coverage ceiling 0.391, attained by lawnmower |
+| 5. PPO to convergence | measured | 3 seeds × 2M steps, flat over the final 20% |
+| 6. τ sensitivity | measured | 7 thresholds; see the caveat below |
+| 7. MC-dropout, deep ensembles, reliability diagrams | **not started** | — |
+| 8. Oracle planner; regret | measured | greedy oracle as a lower bound on the ceiling |
+| 9. ONNX export, latency, deployed interface | **partial** | graph equivalence and latency measured on *untrained* weights; no deployed interface |
 
-Two hypotheses were refuted and reported as such: the advantage did not grow with spatial
-clustering, and performance was **not** monotone in ECE — the *direction* of
-miscalibration governs, not its magnitude. The learned planner also lost to the lawnmower
-baseline at every temperature.
+Full numbers, with their confidence intervals and their caveats, are in
+[`docs/RESULTS.md`](docs/RESULTS.md). Every number there is read from a generated summary
+file; if the two disagree, the document is wrong.
 
-Every one of those numbers came from an instrument that was, by design, not a classifier.
-Removing that limitation is what this repository is for.
+---
 
-**Three claims to earn.**
+## What changed when the surrogate was replaced
 
-1. *The effect is not an artefact of the surrogate.* A fine-tuned EfficientNet-B0,
-   temperature-scaled the same way, should reproduce the qualitative result. If it does
-   not, that is the finding.
-2. *The learned planner can win when the regime allows it.* The pilot ran a 12×12 field
-   with a budget permitting near-total coverage, leaving nothing for selectivity to buy.
-   At 32×32 with ≤40% reachable coverage, adaptive planning has room to win — or to fail
-   for a reason we can name.
-3. *The effect size is not an artefact of one threshold.* The confirmation threshold
-   τ = 0.75 interacts with the temperature manipulation by construction. Until τ is
-   swept, 13.4× is a magnitude *at that threshold*, not a general one.
+This is the reason the repository exists, so it goes first — including the part that is
+unflattering to the pilot.
+
+### The 13.4× collapse does not survive a real classifier
+
+| | Pilot (surrogate) | This phase (EfficientNet-B0) |
+| --- | --- | --- |
+| Lawnmower degradation, `T`=1 → `T`=4 | **13.4×** | **1.27×** |
+| GreedyEntropy degradation | 1.84× | 1.49× |
+| Ranking reversal at `T`=4 | GreedyEntropy beats Lawnmower 7.3× | **no reversal at any `T`** |
+| More robust planner | GreedyEntropy | Lawnmower |
+
+The effect is real and in the same direction — miscalibration costs the planner detections
+per joule at fixed accuracy — but an order of magnitude smaller, and the robustness
+ordering **reverses**. The ECE range swept is comparable (pilot 0.0037–0.1980; here
+0.0080–0.1771 on the shift split), so the difference is attributable to the perception
+model rather than to the manipulation.
+
+That is the finding. It was the outcome the pilot's own README named as acceptable —
+*"should reproduce the qualitative result. If it does not, that is the finding"* — and it
+is reported here without softening.
+
+### The measured sweep
+
+630 jobs: 5 planners × 6 temperatures × 3 cluster scales × 5 evaluation seeds, on the
+PlantDoc shift split. IQM with 95% stratified bootstrap CIs, per Agarwal et al. (2021).
+
+| Planner | `T`=0.3 | `T`=1.0 | `T`=4.0 | Degradation `T`=1→4 | n |
+| --- | --- | --- | --- | --- | --- |
+| Oracle (greedy; lower bound) | 0.2497 [0.2149, 0.2700] | 0.2478 [0.2142, 0.2671] | 0.2364 [0.2094, 0.2501] | 1.05× | 15 |
+| Lawnmower | 0.0910 [0.0780, 0.1009] | 0.0870 [0.0746, 0.0964] | 0.0683 [0.0589, 0.0756] | 1.27× | 15 |
+| PPO | 0.0872 [0.0799, 0.0920] | 0.0848 [0.0781, 0.0891] | 0.0663 [0.0616, 0.0693] | 1.28× | 45 |
+| GreedyEntropy | 0.0738 [0.0616, 0.0817] | 0.0612 [0.0505, 0.0693] | 0.0410 [0.0343, 0.0467] | 1.49× | 15 |
+| Random | 0.0391 [0.0333, 0.0437] | 0.0384 [0.0328, 0.0429] | 0.0350 [0.0299, 0.0393] | 1.10× | 15 |
+
+<sub>Detections per joule. Each cell pools three cluster scales (σ ∈ {0.75, 1.5, 3.0});
+PPO has three times the runs because three independently trained policies were evaluated.
+Source: `results/summary.json`.</sub>
+
+**PPO and the lawnmower are statistically indistinguishable.** The intervals overlap
+heavily at every temperature, so the honest statement is a tie, not a loss. PPO reaches
+within 3% of the lawnmower's recall while visiting 17% fewer cells (coverage 0.325 against
+0.391), with higher precision and fewer false alarms — it is the more selective planner
+without converting selectivity into an efficiency win. The pilot's REINFORCE agent *lost*
+outright; changing algorithm, observation and field scale moved that to a tie.
+
+A confound was found and closed rather than argued about: the first sweep trained PPO
+in-distribution and evaluated it under shift. The policies were retrained on the shift
+split and the sweep re-run in full. PPO moved from 0.0857 to 0.0848 detections per joule —
+the mismatch was not the reason for the gap.
+
+### The pilot's τ caveat is confirmed
+
+The pilot flagged that its 13.4× was a magnitude *at* τ = 0.75, not a general one. Measured
+across seven thresholds, Lawnmower's degradation runs from 1.02× at τ = 0.55 to 2.32× at
+τ = 0.90 — it more than doubles. **No single effect size is quotable without its threshold
+attached.** The dependence is also planner-specific, which the pilot did not predict:
+GreedyEntropy is flat below τ = 0.85 while Lawnmower climbs monotonically, and the two
+curves cross between τ = 0.75 and τ = 0.85.
+
+### Known limitations of what is measured
+
+Stated here rather than left for a reviewer to find.
+
+- **The in-distribution condition is degenerate for this question.** At 0.9998 accuracy and
+  0.0004 ECE, precision is pinned at 1.000 and false alarms at 0 for every PPO episode on
+  every seed, so the precision–recall trade the pilot's mechanism rests on is unmeasurable
+  there. The sweep therefore runs on the shift split, and in-distribution is the control.
+- **PlantVillage leakage is unverified.** 0.9998 is consistent with the literature on that
+  dataset, but the augmented-duplicate guard in `perception/datasets.py` has not been
+  checked against this mirror. Until it is, treat the in-distribution accuracy as
+  provisional.
+- **The τ confidence intervals are currently degenerate.** With one run per seed at each
+  τ, the stratified bootstrap resamples strata of size 1 and returns a zero-width interval.
+  The τ ratios in `docs/RESULTS.md` are point estimates; the intervals in
+  `results/tau_sensitivity_summary.json` should not be quoted until this is fixed.
+- **The headline table pools three cluster scales.** The pilot found planner performance
+  varies strongly with σ. Aggregating over σ is a deliberate choice for the temperature
+  comparison, not a claim that σ does not matter.
+- **The deployment numbers are architecture-level.** Latency and ONNX equivalence were
+  measured on an untrained export, on a laptop CPU. They say nothing about the trained
+  model's field behaviour.
+- **No drone flew.** The field is simulated throughout, as in the pilot.
 
 ---
 
@@ -74,8 +154,8 @@ make install-dev
 make test
 ```
 
-`make test` runs the contract tests against the pinned pilot. If they fail on a fresh
-clone the dependency pin is wrong — fix that before writing anything else.
+`make test` runs the contract tests against the pinned pilot. If they fail on a fresh clone
+the dependency pin is wrong — fix that before writing anything else.
 
 ## Usage
 
@@ -100,7 +180,8 @@ python experiments/make_figures.py
 ```
 
 Same commands via `make train-perception`, `make calibrate`, `make train-ppo`, `make
-sweep`, `make figures`.
+sweep`, `make tau`, `make figures`. Reproducing any specific number:
+[`docs/REPRODUCING.md`](docs/REPRODUCING.md).
 
 ---
 
@@ -120,8 +201,9 @@ sweep`, `make figures`.
                  ┌──────────────▼─────────────────────┐
                  │ scoutfield                          │
                  │  perception/  EfficientNet-B0,      │
-                 │               temperature scaling,  │
-                 │               MC-dropout, ensembles │
+                 │               temperature scaling   │
+                 │               (MC-dropout, ensembles│
+                 │                still to come)       │
                  │  envs/        FieldScoutEnv(ScoutEnv)│
                  │  planners/    PPO (SB3), oracle     │
                  │  analysis/    IQM + bootstrap CIs   │
@@ -141,7 +223,8 @@ CalibratedClassifier.observe(true_label: int) -> tuple[float, int]
 `scoutfield.perception.CNNClassifier` satisfies that same signature while backing it with
 a real network. Everything downstream — belief update, energy accounting, reward, the four
 baseline planners — is untouched. That is deliberate: if the result changes, the classifier
-is the only thing that changed, so the comparison is clean.
+is the only thing that changed, so the comparison is clean. It is also what licenses the
+comparison table above.
 `tests/test_pilot_contract.py` fails if the signature drifts.
 
 ### Depend, don't fork
@@ -184,12 +267,14 @@ scoutfield/
 ├── docs/                       METHOD.md · REPRODUCING.md · RESULTS.md
 ├── scripts/                    kaggle_sync.py · make_notebooks.py
 ├── tests/                      contract tests against the pinned pilot
-└── results/  figures/  checkpoints/       generated; gitignored
+└── results/  figures/  checkpoints/       generated
 ```
 
 `docs/METHOD.md` lists every hyperparameter and the citation behind it, so the
 implementation can be checked against the method without reading the code.
 `docs/REPRODUCING.md` maps each reported number to the exact command that produces it.
+`docs/RESULTS.md` holds the numbers themselves and is written *from* the generated summary
+files.
 
 ---
 
@@ -228,23 +313,24 @@ make notebooks-pull         # Kaggle -> local, executed outputs included
 
 ## Roadmap
 
-Ordered by dependency. Each item names how you know it is done.
+Ordered by dependency. Each item names how you know it is done. ✅ measured · ◐ partial ·
+☐ not started.
 
-| # | Work | Done when |
-| --- | --- | --- |
-| 1 | Fine-tune EfficientNet-B0 on PlantVillage; hold out PlantDoc | accuracy and per-class ECE reported on both sets; checkpoint reproducible from a seed |
-| 2 | `CNNClassifier` behind `observe()` | `make test` passes with the CNN swapped in; pilot baselines run unmodified |
-| 3 | Temperature sweep on the real classifier | accuracy invariant to 4 d.p. across `T` — or a documented explanation of why not |
-| 4 | `FieldScoutEnv`: 32×32, ≤40% coverage, global belief map | coverage ceiling verified empirically; obs dimension asserted in a test |
-| 5 | PPO to convergence | curve plateaus over ≥3 seeds; beats or loses to lawnmower with a stated reason |
-| 6 | τ sensitivity | effect size reported as a curve over τ, not a single number |
-| 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis |
-| 8 | Oracle planner; regret | every planner's gap to the ground-truth ceiling quantified |
-| 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated |
+| # | Work | Done when | State |
+| --- | --- | --- | --- |
+| 1 | Fine-tune EfficientNet-B0 on PlantVillage; hold out PlantDoc | accuracy and per-class ECE reported on both sets; checkpoint reproducible from a seed | ✅ (leakage check outstanding) |
+| 2 | `CNNClassifier` behind `observe()` | `make test` passes with the CNN swapped in; pilot baselines run unmodified | ✅ |
+| 3 | Temperature sweep on the real classifier | accuracy invariant to 4 d.p. across `T` — or a documented explanation of why not | ✅ (invariant to 6 d.p.) |
+| 4 | `FieldScoutEnv`: 32×32, ≤40% coverage, global belief map | coverage ceiling verified empirically; obs dimension asserted in a test | ✅ (0.391 attained) |
+| 5 | PPO to convergence | curve plateaus over ≥3 seeds; beats or loses to lawnmower with a stated reason | ✅ (ties; reason stated) |
+| 6 | τ sensitivity | effect size reported as a curve over τ, not a single number | ✅ (intervals need fixing) |
+| 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis | ☐ |
+| 8 | Oracle planner; regret | every planner's gap to the ground-truth ceiling quantified | ✅ |
+| 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated | ◐ (untrained export only) |
 
-**Standing risks.** Reward shaping can consume weeks — freeze the reward early and sweep
-it only if a result demands it. Simulator realism will be challenged in review, so every
-physical constant traces to a citation and every invented value gets swept.
+**Standing risks.** Reward shaping can consume weeks — the reward is frozen and swept only
+if a result demands it. Simulator realism will be challenged in review, so every physical
+constant traces to a citation and every invented value gets swept.
 
 ---
 
@@ -259,7 +345,8 @@ Inherited from the pilot, and the reason its numbers held up.
 3. **No number is hard-coded into a document.** Results are read from generated summary
    files, so text and data cannot drift apart.
 4. **Negative results are reported.** The pilot published two refuted hypotheses and an
-   underperforming agent. That standard holds here.
+   underperforming agent. That standard holds here — which is why the failure to reproduce
+   its own headline effect size is the first result on this page.
 5. **Generated artefacts are never hand-edited.** A wrong figure means wrong code or
    wrong data.
 
@@ -267,8 +354,9 @@ Inherited from the pilot, and the reason its numbers held up.
 
 ## Citing
 
-Until this phase produces results, cite the pilot study's paper — see
-[`CITATION.cff`](CITATION.cff).
+This phase's results are provisional and not yet written up. **Cite the pilot study's
+paper** — see [`CITATION.cff`](CITATION.cff). If you refer to a number from this
+repository, cite the repository and the commit it was measured at.
 
 ```bibtex
 @mastersthesis{odusina2026calibration,
@@ -283,6 +371,22 @@ Until this phase produces results, cite the pilot study's paper — see
 ```
 
 MIT licensed. See [`LICENSE`](LICENSE).
+
+## References
+
+Agarwal, R., Schwarzer, M., Castro, P. S., Courville, A., & Bellemare, M. G. (2021). Deep
+reinforcement learning at the edge of the statistical precipice. *NeurIPS 34*.
+
+Guo, C., Pleiss, G., Sun, Y., & Weinberger, K. Q. (2017). On calibration of modern neural
+networks. *ICML 34*.
+
+Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). Proximal policy
+optimization algorithms. *arXiv:1707.06347*.
+
+Tan, M., & Le, Q. (2019). EfficientNet: Rethinking model scaling for convolutional neural
+networks. *ICML 36*.
+
+---
 
 **Suggested GitHub topics:** `reinforcement-learning` `computer-vision`
 `uncertainty-quantification` `calibration` `informative-path-planning` `pytorch`

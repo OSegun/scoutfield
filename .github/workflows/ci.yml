@@ -15,16 +15,31 @@ jobs:
         with:
           python-version: "3.11"
 
-      # Only the light dependency set. CI's job is to catch interface drift against
-      # the pinned pilot, not to train a network — the GPU work belongs on Kaggle and
-      # would time out here anyway.
+      # CI's job is to catch interface drift against the pinned pilot, not to train
+      # a network — the GPU work belongs on Kaggle and would time out here.
+      #
+      # torch is still required, and installing it was the omission that turned this
+      # workflow red: the contract test asserting "ECE is minimised at the fitted
+      # temperature" calls perception.calibrate.fit_temperature, which optimises log-T
+      # with LBFGS and therefore imports torch. The CPU wheel index keeps that to a
+      # ~200 MB download instead of pulling the CUDA build.
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,perception,planning,figures]"
 
-      - name: Contract tests
-        run: python -m pytest tests/test_pilot_contract.py -v
+      # The whole suite, not just the contract file. Six of the seven test modules
+      # never ran here before, so env parity, planner and analysis regressions could
+      # land on main with a green badge.
+      #
+      # tests/test_app.py skips itself here, and that is deliberate: it builds a
+      # pretrained backbone, so running it would download ImageNet weights on every
+      # push. It is covered locally by `make install-dev`, which does install the
+      # `app` extra. `-v` is kept so the skip is visible in the log rather than
+      # silently absorbed into a dot.
+      - name: Tests
+        run: python -m pytest -v
 
       - name: Lint
         run: python -m ruff check scoutfield experiments tests

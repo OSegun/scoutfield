@@ -1,0 +1,405 @@
+{
+  "greedy_entropy@tau0.55": {
+    "agent": "greedy_entropy",
+    "tau": 0.55,
+    "iqm_T1": 0.06421488467148344,
+    "iqm_T4": 0.04209024799491892,
+    "ratio": 1.5256475723126024,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.057558368038797374,
+      0.07005508902639716
+    ]
+  },
+  "greedy_entropy@tau0.6": {
+    "agent": "greedy_entropy",
+    "tau": 0.6,
+    "iqm_T1": 0.06418878776600448,
+    "iqm_T4": 0.04209024799491892,
+    "ratio": 1.525027549701139,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.057558368038797374,
+      0.07002899212091819
+    ]
+  },
+  "greedy_entropy@tau0.65": {
+    "agent": "greedy_entropy",
+    "tau": 0.65,
+    "iqm_T1": 0.06416272890478192,
+    "iqm_T4": 0.04209024799491892,
+    "ratio": 1.5244084309630952,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.057558368038797374,
+      0.06995081805231142
+    ]
+  },
+  "greedy_entropy@tau0.7": {
+    "agent": "greedy_entropy",
+    "tau": 0.7,
+    "iqm_T1": 0.06416272890478192,
+    "iqm_T4": 0.04209024799491892,
+    "ratio": 1.5244084309630952,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.057558368038797374,
+      0.06995081805231142
+    ]
+  },
+  "greedy_entropy@tau0.75": {
+    "agent": "greedy_entropy",
+    "tau": 0.75,
+    "iqm_T1": 0.06408446104128014,
+    "iqm_T4": 0.04206419356714359,
+    "ratio": 1.5234919680318468,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.057506139954803775,
+      0.06989862931777228
+    ]
+  },
+  "greedy_entropy@tau0.85": {
+    "agent": "greedy_entropy",
+    "tau": 0.85,
+    "iqm_T1": 0.06364102602577924,
+    "iqm_T4": 0.040264824273987004,
+    "ratio": 1.580561375177648,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.05711486915083617,
+      0.06924664535548551
+    ]
+  },
+  "greedy_entropy@tau0.9": {
+    "agent": "greedy_entropy",
+    "tau": 0.9,
+    "iqm_T1": 0.061632749804884236,
+    "iqm_T4": 0.03390144673713987,
+    "ratio": 1.817997629504231,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.05531578112219201,
+      0.06710763027528464
+    ]
+  },
+  "lawnmower@tau0.55": {
+    "agent": "lawnmower",
+    "tau": 0.55,
+    "iqm_T1": 0.09552527151211292,
+    "iqm_T4": 0.09320175438596423,
+    "ratio": 1.0249299719887954,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08920739348370861,
+      0.10278299916457735
+    ]
+  },
+  "lawnmower@tau0.6": {
+    "agent": "lawnmower",
+    "tau": 0.6,
+    "iqm_T1": 0.09461152882205442,
+    "iqm_T4": 0.08863304093567186,
+    "ratio": 1.0674521354933726,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08784983291562172,
+      0.10189536340852055
+    ]
+  },
+  "lawnmower@tau0.65": {
+    "agent": "lawnmower",
+    "tau": 0.65,
+    "iqm_T1": 0.09416771094402603,
+    "iqm_T4": 0.08244569757727592,
+    "ratio": 1.142178594046865,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08751044277360003,
+      0.10134711779448546
+    ]
+  },
+  "lawnmower@tau0.7": {
+    "agent": "lawnmower",
+    "tau": 0.7,
+    "iqm_T1": 0.09307121971595587,
+    "iqm_T4": 0.0773026315789468,
+    "ratio": 1.203985140155353,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08615288220551315,
+      0.10012009189640696
+    ]
+  },
+  "lawnmower@tau0.75": {
+    "agent": "lawnmower",
+    "tau": 0.75,
+    "iqm_T1": 0.09095655806182056,
+    "iqm_T4": 0.07145467836257256,
+    "ratio": 1.2729265619291197,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08422096908938952,
+      0.09784878863826159
+    ]
+  },
+  "lawnmower@tau0.85": {
+    "agent": "lawnmower",
+    "tau": 0.85,
+    "iqm_T1": 0.08790204678362508,
+    "iqm_T4": 0.050595238095237714,
+    "ratio": 1.737358101135191,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08161027568922245,
+      0.09474206349206278
+    ]
+  },
+  "lawnmower@tau0.9": {
+    "agent": "lawnmower",
+    "tau": 0.9,
+    "iqm_T1": 0.08409043441938117,
+    "iqm_T4": 0.03618421052631552,
+    "ratio": 2.323953823953824,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.07829469507101028,
+      0.0911654135338339
+    ]
+  },
+  "oracle@tau0.55": {
+    "agent": "oracle",
+    "tau": 0.55,
+    "iqm_T1": 0.2622689563023762,
+    "iqm_T4": 0.2624303288470183,
+    "ratio": 0.999385084241783,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.25933219524991086,
+      0.2712855184396383
+    ]
+  },
+  "oracle@tau0.6": {
+    "agent": "oracle",
+    "tau": 0.6,
+    "iqm_T1": 0.26270444549023986,
+    "iqm_T4": 0.2617116492415715,
+    "ratio": 1.0037934736628862,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.25861083429583576,
+      0.27146152905197135
+    ]
+  },
+  "oracle@tau0.65": {
+    "agent": "oracle",
+    "tau": 0.65,
+    "iqm_T1": 0.2619601907131119,
+    "iqm_T4": 0.25899939704408376,
+    "ratio": 1.0114316624008364,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.25865762843648943,
+      0.2713534478088273
+    ]
+  },
+  "oracle@tau0.7": {
+    "agent": "oracle",
+    "tau": 0.7,
+    "iqm_T1": 0.26107870171081776,
+    "iqm_T4": 0.2561855977708735,
+    "ratio": 1.019099840047685,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.2577768408235428,
+      0.2703049029775158
+    ]
+  },
+  "oracle@tau0.75": {
+    "agent": "oracle",
+    "tau": 0.75,
+    "iqm_T1": 0.26100808008045356,
+    "iqm_T4": 0.2502206852024736,
+    "ratio": 1.0431115232110049,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.2576090107213444,
+      0.2695691380516952
+    ]
+  },
+  "oracle@tau0.85": {
+    "agent": "oracle",
+    "tau": 0.85,
+    "iqm_T1": 0.2586716556596122,
+    "iqm_T4": 0.22547977447102172,
+    "ratio": 1.1472055809283073,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.25499971215978606,
+      0.2659840918138028
+    ]
+  },
+  "oracle@tau0.9": {
+    "agent": "oracle",
+    "tau": 0.9,
+    "iqm_T1": 0.2557782688275,
+    "iqm_T4": 0.20870775835764235,
+    "ratio": 1.2255331130968186,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.2534014797723033,
+      0.26300536568427163
+    ]
+  },
+  "ppo@tau0.6": {
+    "agent": "ppo",
+    "tau": 0.6,
+    "iqm_T1": 0.09119930679427618,
+    "iqm_T4": 0.08135221949694443,
+    "ratio": 1.1210426385195502,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08935631657784537,
+      0.09675333129312329
+    ]
+  },
+  "ppo@tau0.75": {
+    "agent": "ppo",
+    "tau": 0.75,
+    "iqm_T1": 0.0889302503652803,
+    "iqm_T4": 0.06828437185262447,
+    "ratio": 1.3023514451771634,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08708726612040639,
+      0.09427589908337147
+    ]
+  },
+  "ppo@tau0.9": {
+    "agent": "ppo",
+    "tau": 0.9,
+    "iqm_T1": 0.08387087405295439,
+    "iqm_T4": 0.0394884625780517,
+    "ratio": 2.123933639785995,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.08181701395613755,
+      0.08822817799681941
+    ]
+  },
+  "random@tau0.55": {
+    "agent": "random",
+    "tau": 0.55,
+    "iqm_T1": 0.04208497946758536,
+    "iqm_T4": 0.04166776359820131,
+    "ratio": 1.0100129172615844,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.03710151724029812,
+      0.04723113258247532
+    ]
+  },
+  "random@tau0.6": {
+    "agent": "random",
+    "tau": 0.6,
+    "iqm_T1": 0.041772095924706924,
+    "iqm_T4": 0.04062497523628432,
+    "ratio": 1.0282368341580685,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.03691903438853989,
+      0.046996444393873626
+    ]
+  },
+  "random@tau0.65": {
+    "agent": "random",
+    "tau": 0.65,
+    "iqm_T1": 0.0416677833549318,
+    "iqm_T4": 0.03963431156898485,
+    "ratio": 1.0513058434838114,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.03684082865190225,
+      0.04694430316878162
+    ]
+  },
+  "random@tau0.7": {
+    "agent": "random",
+    "tau": 0.7,
+    "iqm_T1": 0.04143314498081181,
+    "iqm_T4": 0.038304272273904164,
+    "ratio": 1.0816846926247252,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.036606285001735205,
+      0.046761723936392746
+    ]
+  },
+  "random@tau0.75": {
+    "agent": "random",
+    "tau": 0.75,
+    "iqm_T1": 0.04080742182853479,
+    "iqm_T4": 0.03705280473987826,
+    "ratio": 1.101331521730003,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.03626742743659126,
+      0.0462664657360912
+    ]
+  },
+  "random@tau0.85": {
+    "agent": "random",
+    "tau": 0.85,
+    "iqm_T1": 0.040129659325514426,
+    "iqm_T4": 0.033141160481895054,
+    "ratio": 1.210870673869045,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.03522450896305411,
+      0.045771131585317
+    ]
+  },
+  "random@tau0.9": {
+    "agent": "random",
+    "tau": 0.9,
+    "iqm_T1": 0.03963432220276387,
+    "iqm_T4": 0.03009006301526115,
+    "ratio": 1.3171897374446186,
+    "n": 5,
+    "ci_stratified_by": "pooled (no within-seed replicates)",
+    "ci_T1": [
+      0.03488542282178903,
+      0.045119147339759545
+    ]
+  }
+}

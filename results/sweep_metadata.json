@@ -1,0 +1,48 @@
+{
+  "experiment": "04_sweep",
+  "timestamp": "2026-08-13T12:33:49+00:00",
+  "git_commit": "5e83b37984d6202d7470af2ed2eea0b54c604c01",
+  "pool_split": "shift",
+  "perception_checkpoint": "/kaggle/input/scoutfield-01-perception-finetune/checkpoints/perception/best.pt",
+  "ppo_train_seeds": [
+    0,
+    1,
+    2
+  ],
+  "evaluation_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "agents": [
+    "lawnmower",
+    "random",
+    "greedy_entropy",
+    "ppo",
+    "oracle"
+  ],
+  "temperatures": [
+    0.3,
+    0.5,
+    1.0,
+    2.0,
+    3.0,
+    4.0
+  ],
+  "cluster_sigmas": [
+    0.75,
+    1.5,
+    3.0
+  ],
+  "tau": 0.75,
+  "eval_episodes": 20,
+  "grid": 32,
+  "budget": 640.0,
+  "n_jobs": 630,
+  "configs": {
+    "sweep": "configs/sweep.yaml",
+    "env": "configs/ppo_field32.yaml"
+  }
+}

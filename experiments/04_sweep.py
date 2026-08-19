@@ -253,9 +253,12 @@ def _git_commit() -> str | None:
     """The commit this ran from, or None outside a checkout."""
     import subprocess
 
+    # check=False on purpose: outside a checkout git exits non-zero, and a missing
+    # commit id is recorded as None rather than aborting a sweep that is otherwise
+    # perfectly runnable. Provenance is worth recording, not worth failing over.
     try:
         out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
-                             text=True, timeout=5)
+                             text=True, timeout=5, check=False)
     except (OSError, subprocess.SubprocessError):
         return None
     return out.stdout.strip() or None
@@ -341,7 +344,7 @@ if __name__ == "__main__":
         main()
     except SystemExit:
         raise
-    except BaseException as exc:                       # noqa: BLE001 - reported, not swallowed
+    except BaseException as exc:
         import traceback
 
         traceback.print_exc()

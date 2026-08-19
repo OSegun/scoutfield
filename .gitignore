@@ -10,13 +10,21 @@ venv/
 .env
 .ipynb_checkpoints/
 
-# ------------------------------------------------- generated, never commit
-# Rule: if a script wrote it, git does not track it. Fix the code or the
-# data and re-run rather than hand-editing an artefact.
+# ------------------------------------------------- generated, never hand-edited
+# Rule: if a script wrote it, nobody edits it by hand. Fix the code or the data
+# and re-run.
+#
+# Generated does not mean untracked. Summaries, sweep CSVs and figures ARE
+# tracked, as they are in the pilot: docs/RESULTS.md quotes numbers from them, and
+# a reader who cannot open the file the number came from has to take the document
+# on trust. Weights stay out — they are large and live on Kaggle.
 results/**
 !results/.gitkeep
+!results/*.json
+!results/*.csv
 figures/**
 !figures/.gitkeep
+!figures/*.png
 checkpoints/**
 !checkpoints/.gitkeep
 runs/

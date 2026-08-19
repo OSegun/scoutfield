@@ -41,6 +41,7 @@ def stratified_bootstrap_ci(
     resamples: int = 10_000,
     ci: float = 0.95,
     rng: np.random.Generator | None = None,
+    allow_unstratified: bool = False,
 ) -> tuple[float, float]:
     """Confidence interval by resampling within strata.
 
@@ -48,6 +49,26 @@ def stratified_bootstrap_ci(
     a classifier draw, so they are not independent. Resampling them as if they
     were produces intervals that are too narrow, which is the direction that
     manufactures significance.
+
+    Singleton strata are refused, and that guard exists because it was needed
+    ------------------------------------------------------------------------
+    If every stratum holds exactly one observation, resampling *within* strata can
+    only ever draw that one element back, so all ``resamples`` statistics are
+    identical and the quantiles collapse onto the point estimate. The function
+    then returns a zero-width interval: not a conservative answer, an answer that
+    reports no uncertainty at all — the exact failure this docstring warns about
+    two paragraphs up.
+
+    That happened. The tau sensitivity analysis ran one job per seed at each tau
+    and stratified by seed, and every ``ci_T1`` it wrote to
+    ``results/tau_sensitivity_summary.json`` was zero-width. Raising here means it
+    cannot happen silently again.
+
+    ``allow_unstratified=True`` opts into pooling every observation into one
+    stratum, which is an ordinary bootstrap: valid, slightly anti-conservative
+    when the runs are correlated, and appropriate when the design genuinely cannot
+    supply replicates within a stratum. Callers that use it should record that
+    they did, so the caveat travels with the number.
     """
     values = np.asarray(values, dtype=float)
     strata = np.asarray(strata)
@@ -58,6 +79,17 @@ def stratified_bootstrap_ci(
 
     # Index positions per stratum, so each resample preserves stratum sizes.
     groups = [np.flatnonzero(strata == s) for s in np.unique(strata)]
+
+    if all(g.size == 1 for g in groups):
+        if not allow_unstratified:
+            raise ValueError(
+                f"every stratum has one member ({len(groups)} strata over "
+                f"{values.size} values): resampling within strata cannot vary, so "
+                "the interval would be zero-width. Give the design replicates "
+                "within each stratum, or pass allow_unstratified=True to bootstrap "
+                "over the pooled sample and record that you did."
+            )
+        groups = [np.arange(values.size)]
 
     stats = np.empty(resamples, dtype=float)
     for i in range(resamples):

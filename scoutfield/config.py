@@ -50,7 +50,7 @@ def load_config(path: str | Path) -> Config:
     with p.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
     if not isinstance(data, dict):
-        raise ValueError(f"config {p} did not parse to a mapping")
+        raise TypeError(f"config {p} did not parse to a mapping, got {type(data).__name__}")
     return Config(data=data, path=p)
 
 
