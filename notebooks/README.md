@@ -13,12 +13,11 @@ that loop belongs in a module.
 Each notebook is a directory containing the `.ipynb` and a `kernel-metadata.json`
 that the Kaggle API uses to push and pull it.
 
-**Both files in every directory are generated.** `kernel-metadata.json` is rewritten on
-every run of `scripts/make_notebooks.py`, from `configs/kaggle.yaml` (username, fork,
-branch) and `configs/perception.yaml` (dataset slugs, shared with the training code).
-Kaggle requires one metadata file per kernel — each carries its own id, code file,
+**Both files in every directory are generated**, from `configs/kaggle.yaml` (username,
+fork, branch) and `configs/perception.yaml` (dataset slugs, shared with the training
+code). Kaggle requires one metadata file per kernel — each carries its own id, code file,
 accelerator and attached datasets — but they are maintained in one place, not four. Edit
-a config and re-run the script; hand-edits here are meant to be lost.
+a config and regenerate; hand-edits here are meant to be lost.
 
 ```
 notebooks/
@@ -32,9 +31,8 @@ notebooks/
 ## Sync
 
 ```bash
-pip install kaggle                  # credentials at ~/.kaggle/kaggle.json
-make notebooks-push                 # local -> Kaggle
-make notebooks-pull                 # Kaggle -> local, with executed outputs
+pip install kaggle                                   # credentials at ~/.kaggle/kaggle.json
+kaggle kernels push -p notebooks/01_perception_finetune   # local -> Kaggle, one notebook
 ```
 
 Notebooks are version-controlled, so the repository stays the single source of

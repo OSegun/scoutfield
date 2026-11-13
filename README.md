@@ -203,7 +203,6 @@ scoutfield/
 ├── configs/                    YAML — no hyperparameter lives in code
 ├── notebooks/                  Kaggle kernels, git-tracked, synced via the API
 ├── docs/                       METHOD.md · REPRODUCING.md · RESULTS.md
-├── scripts/                    kaggle_sync.py · make_notebooks.py
 ├── tests/                      contract tests against the pinned pilot
 └── results/  figures/  checkpoints/       generated
 ```
@@ -242,9 +241,8 @@ killed at nine hours and much sooner when idle, so every long job checkpoints pe
 per sweep job and resumes from disk. See `notebooks/README.md`.
 
 ```bash
-pip install kaggle          # credentials at ~/.kaggle/kaggle.json
-make notebooks-push         # local -> Kaggle
-make notebooks-pull         # Kaggle -> local, executed outputs included
+pip install kaggle                                   # credentials at ~/.kaggle/kaggle.json
+kaggle kernels push -p notebooks/01_perception_finetune   # local -> Kaggle, one notebook
 ```
 
 ---

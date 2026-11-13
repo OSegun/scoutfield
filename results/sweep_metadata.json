@@ -1,0 +1,57 @@
+{
+  "experiment": "04_sweep",
+  "run_id": "r2026-11-13",
+  "timestamp": "2026-11-13T13:41:26+00:00",
+  "git_commit": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
+  "pool_split": "shift_eval",
+  "reference_condition": "shift_fitted",
+  "named_conditions": [
+    "lab_fitted"
+  ],
+  "reference_temperatures": {
+    "shift_fitted": 3.3842691021227007,
+    "lab_fitted": 0.994865229637283
+  },
+  "perception_checkpoint_sha256": "03b3b6d2c018c72eb78b96babf1c7fbfdec7fc7eded28678c97a089a0421b5e5",
+  "ppo_train_seeds": [
+    0,
+    1,
+    2
+  ],
+  "evaluation_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "agents": [
+    "lawnmower",
+    "random",
+    "greedy_entropy",
+    "ppo",
+    "oracle"
+  ],
+  "temperatures": [
+    0.3,
+    0.5,
+    1.0,
+    2.0,
+    3.0,
+    4.0
+  ],
+  "cluster_sigmas": [
+    0.75,
+    1.5,
+    3.0
+  ],
+  "tau": 0.75,
+  "eval_episodes": 20,
+  "grid": 32,
+  "budget": 640.0,
+  "n_jobs": 735,
+  "configs": {
+    "sweep": "configs/sweep.yaml",
+    "env": "configs/ppo_field32.yaml"
+  }
+}

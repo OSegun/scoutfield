@@ -281,10 +281,28 @@ def figure_14_tau_surface(tau_summary, plt) -> Path:
         by_agent.setdefault(entry["agent"], []).append((entry["tau"], entry["ratio"]))
 
     fig, ax = plt.subplots(figsize=(6, 3.8))
+    # A planner with no detections at T = 4 has an infinite ratio. Matplotlib drops
+    # non-finite points without a word, which would make the line simply stop; those
+    # points are drawn as triangles on the top edge and labelled instead.
+    unbounded: list[tuple[str, list[float]]] = []
     for colour, (agent, points) in zip(COLOURS, sorted(by_agent.items())):
         points.sort()
-        ax.plot([t for t, _ in points], [r for _, r in points],
+        finite = [(t, r) for t, r in points if np.isfinite(r)]
+        ax.plot([t for t, _ in finite], [r for _, r in finite],
                 marker="o", markersize=4, color=colour, label=agent)
+        infinite = [t for t, r in points if not np.isfinite(r)]
+        if infinite:
+            unbounded.append((colour, infinite))
+
+    if unbounded:
+        top = ax.get_ylim()[1]
+        ax.set_ylim(top=top)
+        for colour, taus in unbounded:
+            ax.scatter(taus, [top] * len(taus), marker="^", s=40, color=colour,
+                       clip_on=False, zorder=3)
+            ax.annotate("no detections at T = 4", (taus[-1], top), fontsize=8,
+                        color=colour, xytext=(-6, -14), textcoords="offset points",
+                        ha="right")
 
     ax.axvline(0.75, color=PALETTE["muted"], linestyle="--", linewidth=1)
     ax.annotate("pilot tau = 0.75", (0.75, ax.get_ylim()[1]), fontsize=8,

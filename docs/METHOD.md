@@ -423,8 +423,9 @@ Every stage reads its inputs from, and writes its outputs to, one public Hugging
 dataset repository named in `configs/artifacts.yaml`, under `runs/<run_id>/<stage>/`. Each
 run's `manifest.json` records every file's SHA-256, the commit of this repository that
 produced it, and the files each stage read, so every number traces to its exact inputs.
-`scripts/pull_artifacts.py --run <run_id>` mirrors a run locally;
-`scripts/verify_stage.py <stage>` checks one.
+The run's final CSV, JSON and figure files are also copied into `results/` and
+`figures/`, and `results/RUN.json` records which run and store revision they came from;
+`docs/REPRODUCING.md` shows how to download a run and check it.
 
 ---
 

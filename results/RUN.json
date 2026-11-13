@@ -1,0 +1,126 @@
+{
+  "run_id": "r2026-11-13",
+  "store": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts",
+  "store_revision": "9a63192351f6b0c7114d5f75717e2cbd3a24eea7",
+  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/9a63192351f6b0c7114d5f75717e2cbd3a24eea7/runs/r2026-11-13",
+  "promoted_at": "2026-11-13T17:03:59+00:00",
+  "promoted_by_commit": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
+  "stage_commits": {
+    "01_perception": "193ec3f779f0c3d37ed1c29ce5be160609853751",
+    "02_calibration": "193ec3f779f0c3d37ed1c29ce5be160609853751",
+    "03_ppo": "184c3c56c902cd58bf28911a2c61a919a18d58bd",
+    "04_sweep": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
+    "05_tau": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
+    "06_figures": "fe6b33d4179506a0ba576b122b722dabb7cd5e47"
+  },
+  "files": [
+    {
+      "path": "results/leakage_report.json",
+      "stage": "01_perception",
+      "sha256": "a222bb944279c5cd2f5017d1936448ac9d1dc4c0e402e9345678803c8b514f3e",
+      "store_commit": "b8e33372846b11f6d975df385ecba68a48c54753"
+    },
+    {
+      "path": "results/perception_summary.json",
+      "stage": "01_perception",
+      "sha256": "1c6fec2dc753c3c093c4239b6bb81bb51d71c225bbd00253ad8a30ebdbf1abb0",
+      "store_commit": "da02ae3f43a25c9516a9038329162415e3589ba9"
+    },
+    {
+      "path": "results/calibration_sweep.json",
+      "stage": "02_calibration",
+      "sha256": "e396d94103273e3fbc32be4403c482febf7aebf9675443213283eb47c63ac15b",
+      "store_commit": "80c2006d70e60cddb6044954b150c57cd0e22307"
+    },
+    {
+      "path": "results/ppo_curve_seed0.json",
+      "stage": "03_ppo",
+      "sha256": "4ebfcca67478649059a5f79c5eca8879cedfc331f63ce42898fcf54e73c11b09",
+      "store_commit": "79d36ed183ff8431c33d41f948b32e2d9a160e23"
+    },
+    {
+      "path": "results/ppo_curve_seed1.json",
+      "stage": "03_ppo",
+      "sha256": "3475b3f10a5c24694e1a40902168803c2e11c95a23ecd7b02d4992f7b30011a0",
+      "store_commit": "6cdbf05fbc76189e7777916225d8a892f81b829d"
+    },
+    {
+      "path": "results/ppo_curve_seed2.json",
+      "stage": "03_ppo",
+      "sha256": "c4570fcb85d884b3fe24b2f6bd05b080a91547162183975c29e16f80f26c409e",
+      "store_commit": "cbf66bf8871c53c1c0b1b2787a31d71aa267aee0"
+    },
+    {
+      "path": "results/summary.json",
+      "stage": "04_sweep",
+      "sha256": "3e6559ff24f07182e8dcd1adb724ed7dc2214ecbe7ae9fac50d0094cdb28b1e8",
+      "store_commit": "9eaf81155587cb6e4fd34adff2bfed2e20b00b7b"
+    },
+    {
+      "path": "results/sweep_metadata.json",
+      "stage": "04_sweep",
+      "sha256": "dbde2791dc295b46051266e6432454b6893ada444086466cc1e9d3560185c2a5",
+      "store_commit": "9eaf81155587cb6e4fd34adff2bfed2e20b00b7b"
+    },
+    {
+      "path": "results/sweep_results.csv",
+      "stage": "04_sweep",
+      "sha256": "f3ee6cc678b87f9dd4d1691d6d37bca83df54123173ec8c7faf02a2331103a57",
+      "store_commit": "9eaf81155587cb6e4fd34adff2bfed2e20b00b7b"
+    },
+    {
+      "path": "results/tau_sensitivity.csv",
+      "stage": "05_tau",
+      "sha256": "05b0db9a9263eddb5acfd5e0817d45aeaba359dc313e88831f9675f6cfc81be9",
+      "store_commit": "c05093b21c03c580315036df1190e89abf680831"
+    },
+    {
+      "path": "results/tau_sensitivity_summary.json",
+      "stage": "05_tau",
+      "sha256": "b45165a19f93849c497d1b44cfbb80bdaf16f736af46bc6b6e95cb75f5be622c",
+      "store_commit": "c05093b21c03c580315036df1190e89abf680831"
+    },
+    {
+      "path": "figures/Figure10_Temperature_Sweep_Real_Classifier.png",
+      "stage": "06_figures",
+      "sha256": "84ad6ac4f99760010e36128b86d63c97a77a48782c19bef2afe23e40e8ec90a4",
+      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "figures/Figure11_Coverage_Ceiling_Field32.png",
+      "stage": "06_figures",
+      "sha256": "1e7b2f93323732ac0548ec12d7d16ce083590b30efb5cbc8bb70e13bee6356e4",
+      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "figures/Figure12_PPO_Learning_Curves.png",
+      "stage": "06_figures",
+      "sha256": "ebb9ed608e639103ee0a7ed1d41876cc421dfe710d51247c574edb87eb2cfb86",
+      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "figures/Figure13_Detections_Per_Joule_By_Temperature.png",
+      "stage": "06_figures",
+      "sha256": "41578d8a3a6c4e265e02a2a1ae18603525c937a487c36f26167bddf4fc66b193",
+      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "figures/Figure14_Tau_Sensitivity_Surface.png",
+      "stage": "06_figures",
+      "sha256": "37dc16457771cd2b0255dbfe0160e79a6e5d244985fb1386b2d2a4aa8d4696b0",
+      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "figures/Figure15_Regret_Against_Oracle.png",
+      "stage": "06_figures",
+      "sha256": "781dbe13ebae7110c9b834203e2fb597ed04b3a6d921fdea225a41bd624eafe9",
+      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "figures/Figure9_Perception_Calibration_Under_Shift.png",
+      "stage": "06_figures",
+      "sha256": "d4eb9898f8214d207d417560c771b036a6d57ca3eff527a4aa88162610368f00",
+      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    }
+  ]
+}

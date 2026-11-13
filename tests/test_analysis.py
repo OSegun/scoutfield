@@ -163,6 +163,32 @@ def test_summary_fails_loudly_when_there_is_nothing_to_read(tmp_path):
         build_summary(tmp_path / "absent.csv")
 
 
+def test_tau_figure_marks_an_infinite_ratio_instead_of_dropping_it(monkeypatch):
+    """No detections at T = 4 gives an infinite ratio; the figure must show it."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "figs", Path("experiments/make_figures.py"))
+    figs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(figs)
+
+    drawn = {}
+    monkeypatch.setattr(figs, "_save", lambda fig, number: drawn.setdefault("fig", fig))
+    summary = {
+        f"lawnmower@tau{t}": {"agent": "lawnmower", "tau": t, "ratio": r}
+        for t, r in ((0.6, 1.4), (0.75, 15.5), (0.9, float("inf")))
+    }
+    figs.figure_14_tau_surface(summary, figs._style())
+
+    ax = drawn["fig"].axes[0]
+    line = ax.get_lines()[0]
+    assert list(line.get_xdata()) == [0.6, 0.75]
+    markers = [c for c in ax.collections if len(c.get_offsets())]
+    assert [list(c.get_offsets()[:, 0]) for c in markers] == [[0.9]]
+    assert any("no detections" in t.get_text() for t in ax.texts)
+
+
 def test_figures_refuse_a_stale_summary(tmp_path):
     """A stale summary quietly producing plausible figures is the failure mode
     most likely to reach a document unnoticed."""

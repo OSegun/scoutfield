@@ -1,11 +1,9 @@
 """
 The first cell of every Kaggle notebook. Kept here so there is one copy to fix.
 
-The cell is rendered from ``configs/kaggle.yaml`` and ``configs/artifacts.yaml`` by
-``scripts/make_notebooks.py``, so changing the fork, the branch or the store means
-editing that YAML and re-running:
-
-    python scripts/make_notebooks.py --force
+The cell is rendered from ``configs/kaggle.yaml`` and ``configs/artifacts.yaml``, so
+changing the fork, the branch or the store means editing that YAML and regenerating the
+notebooks.
 
 Two checks run before anything is cloned or installed
 ------------------------------------------------------
@@ -116,7 +114,7 @@ print("HF_TOKEN:", "present" if os.environ.get("HF_TOKEN") else "MISSING")
 
 def render_bootstrap(repo: str = "OSegun/scoutfield", branch: str = "main",
                      gpu: bool = True, kernel: str = "") -> str:
-    """Fill the template. Called by scripts/make_notebooks.py with the configs."""
+    """Fill the template from the configs."""
     cell = CHECKS_TEMPLATE
     if gpu:
         cell += GPU_CHECK_TEMPLATE

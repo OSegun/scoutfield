@@ -90,9 +90,21 @@ has passed. Notebook 01 alone needs
 `RESUME = True` set in its run cell, because resuming fine-tuning is refused unless asked
 for.
 
-After each stage, `python scripts/verify_stage.py <stage>` checks it and prints its key
-numbers; `python scripts/pull_artifacts.py --run <run_id>` mirrors a whole run to the
-laptop.
+The store is public, so a run can be downloaded without an account. Pin the store
+revision recorded in `results/RUN.json` (`store_revision`) so the files are exactly the
+ones the tracked results came from:
+
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_download("OSegun/scoutfield-artifacts", repo_type="dataset",
+                  revision="<store_revision from results/RUN.json>",
+                  allow_patterns="runs/<run_id>/*", local_dir="artifacts")
+```
+
+`runs/<run_id>/manifest.json` lists every file with its SHA-256. Each file under
+`results/` and `figures/` is listed in `results/RUN.json` with the SHA-256 the manifest
+recorded for it, so the tracked results can be checked against the run byte for byte.
 
 ---
 
@@ -175,21 +187,16 @@ would make these numbers incomparable to the pilot's. Covered by
 
 ## 6. On Kaggle
 
-Notebooks are version-controlled here and synced with the Kaggle API, so the repository
-stays the single source of truth:
-
-```bash
-pip install kaggle          # credentials at ~/.kaggle/kaggle.json
-make notebooks-push
-make notebooks-pull
-```
+Notebooks are version-controlled here and uploaded to Kaggle with the Kaggle API
+(`kaggle kernels push -p notebooks/<notebook>`), so the repository stays the single
+source of truth.
 
 Each notebook clones and installs this repo rather than containing logic. It clones
 because `experiments/` and `configs/` are not packaged, so a pip install alone leaves the
 drivers and the configs absent; it installs *from the clone* so that nothing depends on
 `raw.githubusercontent.com` and no second copy of the package can shadow the cloned one.
-The cell is generated from `configs/kaggle.yaml` — change a username or a fork there and
-run `python scripts/make_notebooks.py --force`.
+The cell is generated from `configs/kaggle.yaml` — a username or a fork is changed there
+and the notebooks regenerated.
 
 Every run prints the commit it cloned. Quote that commit beside any number the run
 produced: the notebooks track `main`, and `main` moves.

@@ -1,14 +1,12 @@
 # Everything about this project that depends on *who* is running it.
 #
-# This is the one place to change a username or a fork. `scripts/make_notebooks.py`
-# reads this file and regenerates all four notebooks/*/kernel-metadata.json and the
-# shared bootstrap cell from it:
-#
-#     python scripts/make_notebooks.py --force
+# This is the one place to change a username or a fork. All four
+# notebooks/*/kernel-metadata.json files and the shared bootstrap cell are generated
+# from this file.
 #
 # Kaggle requires one kernel-metadata.json per kernel directory — each declares its own
 # id, code_file, accelerator and attached datasets, so four kernels mean four files.
-# They are generated, never hand-edited: edit this file and re-run the script.
+# They are generated, never hand-edited: edit this file and regenerate them.
 
 # Your Kaggle username, lowercase. It prefixes every kernel id: <username>/<slug>.
 # A push fails with 403 if this does not match the account that owns the API token.

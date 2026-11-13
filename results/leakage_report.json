@@ -1,0 +1,38 @@
+{
+  "plantvillage": {
+    "n_images": 54305,
+    "n_source_keys": 54305,
+    "n_unique_contents": 54284,
+    "n_files_with_an_identical_copy": 42,
+    "split_sizes": {
+      "train": 38011,
+      "val": 8144,
+      "test": 8150
+    },
+    "source_keys_across_splits": 0,
+    "contents_across_splits": 0,
+    "key_only_split_contents_across_splits": 12
+  },
+  "plantdoc": {
+    "n_images": 2922,
+    "n_unique_contents": 2916,
+    "split_sizes": {
+      "shift_fit": 1461,
+      "shift_eval": 1461
+    },
+    "source_keys_across_splits": 0,
+    "contents_across_splits": 0
+  },
+  "plantvillage_plantdoc_identical_files": 0,
+  "membership": {
+    "val": "ae03b42a9eaf7dbedd921dda579bcf31c4810101c2fb11c7af3054579aa658a9",
+    "test": "62d48e90cb1471c2f9c17e0b29ca0d4349aa75894d88fde38266e8625a0f6627",
+    "train": "a3eb92b94d6d63d57fa2911b3bd2745ddfa03149443f4b1c295fc2eb0899b9e6",
+    "shift": "3b583005589e090ae194cf5d20183247dce6869ca56f479bc6da9738d6da3251",
+    "shift_fit": "c74d795c8114deef7090c609760219f4309c5c16761b583e9b021f7475397aea",
+    "shift_eval": "50162f4af94f9b44ae9a79500d2e6c3e0d0774e48f4b5013d2fb2c2d4cdeb084"
+  },
+  "cross_split_duplicates": 0,
+  "git_commit": "193ec3f779f0c3d37ed1c29ce5be160609853751",
+  "config": "configs/perception.yaml"
+}

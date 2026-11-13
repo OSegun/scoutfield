@@ -1,4 +1,4 @@
-.PHONY: install install-dev test lint fmt clean notebooks-push notebooks-pull \
+.PHONY: install install-dev test lint fmt clean \
         train-perception calibrate train-ppo sweep tau figures app
 
 PY ?= python
@@ -38,16 +38,6 @@ tau:                ## 5. tau sensitivity — unblocks quoting the effect size
 
 figures:            ## 6. rebuild every figure from results/summary.json
 	$(PY) experiments/make_figures.py
-
-# ----------------------------------------------------------------- kaggle
-notebooks-push:     ## push notebooks/ to Kaggle (needs ~/.kaggle/kaggle.json)
-	$(PY) scripts/kaggle_sync.py push
-
-notebooks-pull:     ## pull the executed notebooks back down, outputs included
-	$(PY) scripts/kaggle_sync.py pull
-
-notebooks-build:    ## regenerate notebook skeletons from scripts/make_notebooks.py
-	$(PY) scripts/make_notebooks.py
 
 # -------------------------------------------------------------------- app
 app:
