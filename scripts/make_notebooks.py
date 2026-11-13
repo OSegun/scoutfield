@@ -136,9 +136,10 @@ NOTEBOOKS = [
         ),
         "calls": [
             "# The sweep exits 0 while jobs remain, 1 when every job is done and 2 if it",
-            "# aborted, so the loop's final exit code says which one happened.",
-            ("!bash -c 'while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done; "
-             "echo $? > /tmp/sweep_exit'"),
+            "# aborted. The first non-zero code is recorded inside the loop, because a",
+            "# `while` loop whose condition fails reports 0, not the condition's code.",
+            ("!bash -c 'while true; do JOB_BUDGET=60 python experiments/04_sweep.py "
+             "|| { echo $? > /tmp/sweep_exit; break; }; done'"),
             "SWEEP_EXIT = int(open('/tmp/sweep_exit').read())",
             "assert SWEEP_EXIT == 1, (f'sweep aborted (exit {SWEEP_EXIT}); see the output '",
             "                         'above. Running again resumes from the store.')",
