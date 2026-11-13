@@ -1,17 +1,17 @@
 {
   "run_id": "r2026-11-13",
   "store": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts",
-  "store_revision": "9a63192351f6b0c7114d5f75717e2cbd3a24eea7",
-  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/9a63192351f6b0c7114d5f75717e2cbd3a24eea7/runs/r2026-11-13",
-  "promoted_at": "2026-11-13T17:03:59+00:00",
-  "promoted_by_commit": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
+  "store_revision": "67900dae5544905c7c06545064a67851140fcd34",
+  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/67900dae5544905c7c06545064a67851140fcd34/runs/r2026-11-13",
+  "promoted_at": "2026-11-13T17:38:53+00:00",
+  "promoted_by_commit": "c2f0b92fc4f787188d9f3434754502688ef315b4",
   "stage_commits": {
     "01_perception": "193ec3f779f0c3d37ed1c29ce5be160609853751",
     "02_calibration": "193ec3f779f0c3d37ed1c29ce5be160609853751",
     "03_ppo": "184c3c56c902cd58bf28911a2c61a919a18d58bd",
     "04_sweep": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
     "05_tau": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
-    "06_figures": "fe6b33d4179506a0ba576b122b722dabb7cd5e47"
+    "06_figures": "c2f0b92fc4f787188d9f3434754502688ef315b4"
   },
   "files": [
     {
@@ -107,8 +107,8 @@
     {
       "path": "figures/Figure14_Tau_Sensitivity_Surface.png",
       "stage": "06_figures",
-      "sha256": "37dc16457771cd2b0255dbfe0160e79a6e5d244985fb1386b2d2a4aa8d4696b0",
-      "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+      "sha256": "697be4e2883923dfa3440f293704b6dfbd324cb664aaaf576d901a12d8b36693",
+      "store_commit": "9a0ad347dcd203a0c9c94870f770b480033a5854"
     },
     {
       "path": "figures/Figure15_Regret_Against_Oracle.png",
