@@ -10,8 +10,10 @@ pilot's effect was real or an artefact of the surrogate.
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![pilot](https://img.shields.io/badge/pilot-scoutplan%20v1.0.0-2C5F2D)](https://github.com/OSegun/scoutplan)
 
-> **Status: research in progress, not a finished study.** The pipeline is built and runs
-> end to end. **Results: in production.** Nothing here has been peer-reviewed.
+> **Status: research in progress, not a finished study.** The pipeline is built and has run
+> end to end. **Results: run `r2026-11-13`, reported in [`docs/RESULTS.md`](docs/RESULTS.md).**
+> Uncertainty methods and deployment measurements are not yet run. Nothing here has been
+> peer-reviewed.
 >
 > The **completed** work is the pilot study: 195 executed runs, 8 figures, a full write-up,
 > frozen in the companion repository [**scoutplan**](https://github.com/OSegun/scoutplan)
@@ -44,13 +46,45 @@ and it needs no budget.
 | 4. `FieldScoutEnv`: 32×32, ≤40% coverage | implemented |
 | 5. PPO to convergence | implemented |
 | 6. τ sensitivity | implemented |
-| 7. MC-dropout, deep ensembles, reliability diagrams | **not started** |
+| 7. MC-dropout, deep ensembles, reliability diagrams | **partial**: reliability diagrams drawn (Figure 9); MC-dropout and deep ensembles not run |
 | 8. Oracle planner; regret | implemented |
-| 9. ONNX export, latency, deployed interface | **partial**: export and latency harness; no deployed interface |
+| 9. ONNX export, latency, deployed interface | **partial**: export and latency harness; not measured from the trained checkpoint; no deployed interface |
 
-Results are in production. They will be in [`docs/RESULTS.md`](docs/RESULTS.md), and every
-number there is read from a generated summary file; if the two disagree, the document is
-wrong.
+Results are in [`docs/RESULTS.md`](docs/RESULTS.md). Every number there is read from the
+files in `results/`, which are copies of one run's outputs; if the two disagree, the
+document is wrong.
+
+---
+
+## What this run measured
+
+Run `r2026-11-13`: 735 evaluation runs and a 2610-run τ sweep, on PlantDoc field images
+the classifier was never trained on, with `T` relative to the temperature fitted on field
+images. Detections per joule degrades by the ratios below across three spans of `T`
+(IQM, 95% stratified bootstrap CI). The pilot's values for the same spans are beside
+them.
+
+| Planner | Full, `T` 0.3 → 4 | Overconfident, `T` 0.3 → 1 | Underconfident, `T` 1 → 4 |
+| --- | --- | --- | --- |
+| Lawnmower | 18.52 [15.00, 23.09] (pilot 13.41) | 1.19 [0.98, 1.45] (pilot 1.23) | 15.54 [12.54, 19.39] (pilot 10.86) |
+| GreedyEntropy | 1.50 [1.23, 1.83] (pilot 1.84) | 1.39 [1.15, 1.75] (pilot 1.59) | 1.08 [0.86, 1.31] (pilot 1.16) |
+| PPO | 2.22 [2.02, 2.45] | 1.15 [1.05, 1.27] | 1.93 [1.74, 2.13] |
+| Random | 1.70 [1.39, 2.05] | 1.07 [0.88, 1.30] | 1.59 [1.30, 1.92] |
+| Oracle | 1.39 [1.19, 1.52] | 1.03 [0.87, 1.20] | 1.35 [1.18, 1.46] |
+
+The pilot used a surrogate classifier on a 12 × 12 field, so the spans are matched and
+the magnitudes are not expected to be. All at τ = 0.75; across the τ grid Lawnmower's
+underconfident ratio runs from 1.13 at τ = 0.55 to no detections at all at `T` = 4 for
+τ ≥ 0.85. Of the five predictions registered before the run, four held and one (P5) did
+not; the rules and values are in `docs/RESULTS.md`, section *"5. Pre-registered
+predictions"*.
+
+**Checkpoints and every intermediate file** (classifier weights, logit pools, PPO
+policies, resume state and the run manifest) are in the public artefact store, pinned to
+the revision the results were taken from:
+[`runs/r2026-11-13`](https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/67900dae5544905c7c06545064a67851140fcd34/runs/r2026-11-13).
+`results/RUN.json` lists every file promoted into this repository with its SHA-256;
+`docs/REPRODUCING.md` shows how to download the run and check it.
 
 ---
 
@@ -76,6 +110,14 @@ Stated here rather than left for a reviewer to find.
 - **The headline table pools three cluster scales.** The pilot found planner performance
   varies strongly with σ. Aggregating over σ is a deliberate choice for the temperature
   comparison, not a claim that σ does not matter.
+- **No single effect size exists without its threshold.** The degradation depends
+  strongly on the confirmation threshold τ, and differently for each planner; every ratio
+  is quoted at its τ.
+- **The τ sweep evaluates one PPO policy.** For cost, PPO's τ runs use the seed 0 policy
+  at the median cluster scale only, so its τ curve has 5 runs per point against 15 for
+  each baseline.
+- **Uncertainty methods and deployment are not run in this release.** MC-dropout and deep
+  ensembles are not compared, and no latency is reported for the trained checkpoint.
 - **Deployment numbers are machine-specific.** Latency is measured on stated hardware and
   says nothing about the trained model's field behaviour.
 - **No drone flew.** The field is simulated throughout, as in the pilot.
@@ -204,7 +246,8 @@ scoutfield/
 ├── notebooks/                  Kaggle kernels, git-tracked, synced via the API
 ├── docs/                       METHOD.md · REPRODUCING.md · RESULTS.md
 ├── tests/                      contract tests against the pinned pilot
-└── results/  figures/  checkpoints/       generated
+├── results/  figures/          one run's final outputs, copied from the artefact store
+└── checkpoints/                generated locally, untracked
 ```
 
 `docs/METHOD.md` lists every hyperparameter and the citation behind it, so the
@@ -237,8 +280,9 @@ The cell is generated, not hand-written — see `notebooks/_bootstrap.py` and
 `configs/kaggle.yaml`.
 
 Internet **on**, accelerator **GPU**, persistence **variables and files**. Sessions are
-killed at nine hours and much sooner when idle, so every long job checkpoints per epoch or
-per sweep job and resumes from disk. See `notebooks/README.md`.
+killed at nine hours and much sooner when idle, so every long job pushes its progress to
+the artefact store and resumes from there when the notebook is run again. See
+`notebooks/README.md`.
 
 ```bash
 pip install kaggle                                   # credentials at ~/.kaggle/kaggle.json
@@ -249,8 +293,8 @@ kaggle kernels push -p notebooks/01_perception_finetune   # local -> Kaggle, one
 
 ## Roadmap
 
-Ordered by dependency. Each item names how you know it is done. ✅ implemented, results
-in production · ◐ partial · ☐ not started.
+Ordered by dependency. Each item names how you know it is done. ✅ done, results in
+`docs/RESULTS.md` · ◐ partial · ☐ not started.
 
 | # | Work | Done when | State |
 | --- | --- | --- | --- |
@@ -260,7 +304,7 @@ in production · ◐ partial · ☐ not started.
 | 4 | `FieldScoutEnv`: 32×32, ≤40% coverage, global belief map | coverage ceiling verified empirically; obs dimension asserted in a test | ✅ |
 | 5 | PPO to convergence | curve plateaus over ≥3 seeds; beats or loses to lawnmower with a stated reason | ✅ |
 | 6 | τ sensitivity | effect size reported as a curve over τ, not a single number | ✅ |
-| 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis | ☐ |
+| 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis | ◐ |
 | 8 | Oracle planner; regret | every planner's gap to the ground-truth ceiling quantified | ✅ |
 | 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated | ◐ |
 
@@ -289,9 +333,10 @@ Inherited from the pilot, and the reason its numbers held up.
 
 ## Citing
 
-This phase's results are in production and not yet written up. **Cite the pilot study's
-paper** — see [`CITATION.cff`](CITATION.cff). If you refer to a number from this
-repository, cite the repository and the commit it was measured at.
+This phase's results (run `r2026-11-13`) are not yet written up as a paper. **Cite the
+pilot study's paper** — see [`CITATION.cff`](CITATION.cff). If you refer to a number from
+this repository, cite the repository, the release it appears in, and the run it comes
+from.
 
 ```bibtex
 @mastersthesis{odusina2026calibration,
