@@ -207,6 +207,22 @@ the sign, and the pilot's refuted hypothesis H2 is precisely a finding about dir
 mattering more than magnitude: overconfidence trades precision for recall, while
 underconfidence loses both.
 
+Every split, at its fitted temperature and at every `T` of the sweep, reports these
+metrics (`scoutfield/perception/metrics.py`, written to `calibration_sweep.json`):
+
+| Metric | Definition | Why it is reported |
+| --- | --- | --- |
+| Accuracy | share of hard predictions that match the label | the instrument's invariant: identical at every `T` |
+| ECE | gap between confidence and accuracy in each of 15 equal-width bins, averaged with each bin weighted by its share of predictions; the pilot's implementation | the pilot's calibration measure, so the phases compare |
+| Signed calibration error | the same weighted average without the absolute value, which equals mean confidence minus accuracy | keeps the direction ECE discards: positive is overconfident |
+| Maximum calibration error | largest gap in any bin | the worst region, which an average hides |
+| NLL | mean binary negative log-likelihood of the reported probability of disease | a proper scoring rule, the quantity the temperature fit minimises |
+| Brier score | mean squared difference between the reported probability of disease and the label | a proper scoring rule that, unlike NLL, stays bounded on confident mistakes |
+| Mean confidence | mean reported probability of the predicted class | shows which way `T` moved the classifier |
+
+Confidence, in ECE and its relatives, is the probability of the *predicted* class, as in
+the pilot.
+
 ### The logit pool, and its one limitation
 
 The environment cannot run a network per observation: a scouting episode makes hundreds of
@@ -301,9 +317,15 @@ crosses any fixed threshold. Raising `T` pushes probabilities toward 0.5 and mak
 crossing τ = 0.75 rarer; lowering it makes crossing commoner.
 
 Some portion of the pilot's 13.4× collapse is therefore attributable to the threshold
-rather than to miscalibration. Until `experiments/05_tau_sensitivity.py` runs over
-τ ∈ {0.55, 0.60, 0.65, 0.70, 0.75, 0.85, 0.90}, **13.4× may be quoted only as "at
-τ = 0.75"**.
+rather than to miscalibration, and the same holds for any ratio measured here.
+`experiments/05_tau_sensitivity.py` measures the underconfident-span ratio (`T` 1 → 4)
+over τ ∈ {0.55, 0.60, 0.65, 0.70, 0.75, 0.85, 0.90} (`tau_sensitivity.tau_grid` in
+`configs/sweep.yaml`). Baselines run every cluster scale. PPO runs the reduced grid
+τ ∈ {0.60, 0.75, 0.90} (`ppo_tau_grid`) with the policy trained at the top-level `seed`
+of `configs/sweep.yaml` (0), at the median cluster scale only, because its evaluation is
+far slower; its τ curve therefore rests on fewer runs per point, and its value at
+τ = 0.75 is not the main sweep's. **Every degradation ratio is quoted with its τ.** The
+measured dependence is in `docs/RESULTS.md`, section *"4. τ sensitivity"*.
 
 ---
 
@@ -313,7 +335,7 @@ rather than to miscalibration. Until `experiments/05_tau_sensitivity.py` runs ov
 | --- | --- | --- |
 | Lawnmower | pilot, imported | fixed boustrophedon sweep; the baseline that beat everything in the pilot |
 | Random | pilot, imported | uniform random move; the pilot ships no Spiral agent |
-| GreedyEntropy | pilot, imported | one-step myopic information gain; the robust performer (1.84× degradation) |
+| GreedyEntropy | pilot, imported | one-step myopic information gain; the pilot's robust performer (1.84× degradation, `T` 0.3 → 4) |
 | PPO | here | Stable-Baselines3, `MlpPolicy`, `[256, 256]` |
 | Oracle | here | sees true labels; defines regret |
 
@@ -324,7 +346,7 @@ comparing against this project's version of the baseline rather than the publish
 
 | Parameter | Value | Note |
 | --- | --- | --- |
-| `total_timesteps` | 2,000,000 | "converged" means the evaluation curve is flat over the last ~20% on **every** seed, not that a step count was reached |
+| `total_timesteps` | 2,000,000 | "converged" means the training curve is flat at the end on **every** seed, not that a step count was reached: the mean detections per joule over the last 20% of episodes is within 5% of the mean over the 20% before it, computed and written into each curve file |
 | `n_envs` | 8 | `SubprocVecEnv`, each seeded distinctly — sharing an env across subprocesses correlates runs and silently narrows confidence intervals |
 | `n_steps` / `batch_size` | 512 / 512 | |
 | `gamma` / `gae_lambda` | 0.99 / 0.95 | |
@@ -332,6 +354,7 @@ comparing against this project's version of the baseline rather than the publish
 | `ent_coef` | 0.01 | detection events are rare; premature entropy collapse is the failure to watch for |
 | `learning_rate` | 3e-4 | |
 | Seeds | ≥3 for the learning curve, 5 for evaluation | a single seed's curve is not evidence of convergence |
+| `checkpoint_freq` | 400,000 | how often resume state is pushed to the artefact store; it does not affect learning. Each push is two store commits and the store accepts 128 an hour, so a shorter interval stops training on a fast GPU. A killed session loses at most this many steps. |
 | Inference device | CPU | evaluation is thousands of short episodes where per-step transfer latency dominates; GPU is slower here and CPU keeps the sweep runnable without quota |
 
 ### Oracle, and the honesty about it
@@ -356,7 +379,7 @@ ceiling.
 | --- | --- | --- |
 | Estimator | interquartile mean | RL returns are heavy-tailed and multimodal; one lucky seed drags a mean. Agarwal et al. (2021) |
 | Interval | stratified bootstrap, 10,000 resamples, 95% | stratify by seed: runs sharing a seed share a field layout and classifier draws, so treating them as independent gives intervals that are too narrow — the direction that manufactures significance |
-| Also report | probability of improvement | "GreedyEntropy beats Lawnmower 7.4×" is a ratio of central tendencies and says nothing about how often it wins on an individual field. A practitioner choosing a planner cares about the latter. Agarwal et al. (2021) |
+| Also report | probability of improvement | "GreedyEntropy beats Lawnmower 7.3×" is a ratio of central tendencies and says nothing about how often it wins on an individual field. A practitioner choosing a planner cares about the latter. Agarwal et al. (2021) |
 | Seeds | 5 | Colas et al. (2018, 2019) |
 
 **Never mean ± std over three seeds.** It is the commonest reason RL results fail to
