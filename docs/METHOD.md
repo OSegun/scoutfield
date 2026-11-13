@@ -395,6 +395,26 @@ The pilot values are from `scoutplan/results/summary.json` at `v1.0.0` (`dpj_iqm
 the pilot's collapse lies on the underconfident half, so a comparison between the phases is
 like-for-like only span by span.
 
+### Pre-registered predictions
+
+Recorded 13 November 2026, before the run that tests them. Each is judged on the
+`shift_eval` pool, relative to the shift-fitted temperature, at τ = 0.75, from the
+detections-per-joule IQM in `summary.json` (`degradation` for P1–P3, `cells` for P4,
+`conditions` for P5). The decision rule for each is fixed here, and each will be reported
+as held or not held, whichever it turns out to be.
+
+| | Prediction | Pilot value | Held if |
+| --- | --- | --- | --- |
+| P1 | On the overconfident half (T 0.3 → 1), Lawnmower detections per joule falls modestly, and GreedyEntropy falls more. | Lawnmower 1.23×, GreedyEntropy 1.59× | both ratios are above 1, and GreedyEntropy's ratio is above Lawnmower's |
+| P2 | On the underconfident half (T 1 → 4), Lawnmower detections per joule falls sharply. How sharply, with a real classifier, is the question this phase answers. | Lawnmower 10.86× | the lower bound of Lawnmower's 95% interval on the underconfident ratio is above 1, and its ratio is above its overconfident ratio |
+| P3 | On the underconfident half, GreedyEntropy is less sensitive than Lawnmower. | GreedyEntropy 1.16× against Lawnmower 10.86× | GreedyEntropy's underconfident ratio is below Lawnmower's |
+| P4 | PPO, trained at the shift-calibrated point, does not beat Lawnmower on detections per joule. | the pilot's REINFORCE agent lost at every temperature | at T = 1, PPO's 95% interval does not lie entirely above Lawnmower's |
+| P5 | The lab-calibrated condition has lower precision than the shift-calibrated condition, for every planner. | not measured in the pilot | for every planner, precision under `lab_fitted` is below precision at T = 1 under `shift_fitted` |
+
+P2 predicts a direction, not a size: the pilot's 10.86× came from a Gaussian surrogate, and
+nothing here predicts that a real classifier reproduces it. Every ratio is reported with
+its interval whether or not its prediction held.
+
 ---
 
 ## 6. Where results live
