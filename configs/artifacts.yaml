@@ -5,7 +5,7 @@ hub_repo: OSegun/scoutfield-artifacts
 repo_type: dataset
 # One identifier per full pipeline run. Change it to start a new, separate run;
 # never reuse one.
-run_id: r2026-11-01          # Segun sets the real date when Part D starts
-local_cache: .artifact_cache  # gitignored
+run_id: r2026-11-13 # Set the real date when Part D starts
+local_cache: .artifact_cache # gitignored
 # Resumable state is pushed this often so a killed Kaggle session loses at most this much.
 push_every_jobs: 25
