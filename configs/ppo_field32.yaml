@@ -71,6 +71,11 @@ ppo:
   policy: MlpPolicy
   net_arch: [256, 256]
   checkpoint_dir: checkpoints/ppo
-  checkpoint_freq: 50_000
+  # Resume state and curve are pushed to the artefact store every this many steps.
+  # Each push is two Hugging Face commits, and a repository accepts 128 commits an
+  # hour. On a T4 one seed trains in about 25 minutes, so 50_000 meant a push every
+  # ~35 s, over the limit. 400_000 is 5 pushes per seed; a killed session loses at
+  # most ~5 minutes of training. Learning is unaffected by this value.
+  checkpoint_freq: 400_000
   eval_episodes: 20
   eval_seeds: [0, 1, 2, 3, 4]

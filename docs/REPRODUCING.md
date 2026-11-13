@@ -46,7 +46,7 @@ a resumed sweep treats two different runs as the same completed job and skips on
 | 0 | `python experiments/00_check_leakage.py --config configs/perception.yaml` | minutes, CPU | `leakage_report.json` (stage `01_perception`) |
 | 1 | `python experiments/01_finetune_perception.py --config configs/perception.yaml` | ~40 min, GPU | `best.pt`, `last.pt`, `perception_summary.json` (stage `01_perception`) |
 | 2 | `python experiments/02_calibrate.py --config configs/perception.yaml` | ~10 min, GPU | `calibration_sweep.json` and three logit pools (stage `02_calibration`) |
-| 3 | `python experiments/03_train_ppo.py --config configs/ppo_field32.yaml --seed 0` | ~2 h/seed, GPU | `checkpoints/ppo/seed0/` |
+| 3 | `python experiments/03_train_ppo.py --config configs/ppo_field32.yaml --seed 0` | ~25 min/seed, GPU (measured) | `checkpoints/ppo/seed0/` |
 | 4 | `while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done` | ~1 h, CPU | `results/sweep_results.csv`, `results/summary.json` |
 | 5 | `python experiments/05_tau_sensitivity.py --config configs/sweep.yaml` | ~3 h, CPU | `results/tau_sensitivity.csv` |
 | 6 | `python experiments/make_figures.py` | seconds | `figures/Figure9..16_*.png` |
@@ -82,7 +82,11 @@ pipeline fully offline.
 
 Long stages push their resume state as they go (fine-tuning every epoch, PPO every
 `checkpoint_freq` steps, the sweeps every `push_every_jobs` jobs), so a session that ends
-early is resumed by running the same notebook again. Notebook 01 alone needs
+early is resumed by running the same notebook again. Each push is two commits to the
+store (the files, then the manifest), and Hugging Face accepts at most 128 commits an
+hour per repository, so these intervals are chosen to stay well below that rate; a push
+refused by the limit stops the stage, which is then resumed the same way once the hour
+has passed. Notebook 01 alone needs
 `RESUME = True` set in its run cell, because resuming fine-tuning is refused unless asked
 for.
 
