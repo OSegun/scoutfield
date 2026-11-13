@@ -19,6 +19,28 @@ from pathlib import Path
 from typing import Any
 
 
+def replace_atomically(tmp: Path, target: Path, attempts: int = 20,
+                       wait: float = 0.05) -> None:
+    """``tmp.replace(target)``, retried briefly when Windows reports the target busy.
+
+    On Windows a rename onto a file fails with ``PermissionError`` while any other
+    process (an antivirus scan, the search indexer, a sync client) holds it open,
+    even for a moment. That happens during long sweeps on a laptop. The rename is
+    retried for up to ``attempts * wait`` seconds; a lock that outlasts that is
+    real and is raised.
+    """
+    import time
+
+    for attempt in range(attempts):
+        try:
+            tmp.replace(target)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(wait)
+
+
 class DoneRegistry:
     """Tracks which jobs have completed, persisted as JSON.
 
@@ -48,7 +70,7 @@ class DoneRegistry:
         tmp = self.path.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as fh:
             json.dump(sorted(self._done), fh, indent=0)
-        tmp.replace(self.path)  # atomic; a kill mid-write cannot corrupt the registry
+        replace_atomically(tmp, self.path)  # a kill mid-write cannot corrupt it
 
     def reset(self) -> None:
         """Clear the registry. Also delete the results CSV, or a restarted sweep
@@ -119,7 +141,7 @@ def save_training_state(path: str | Path, state: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     torch.save(state, tmp)
-    tmp.replace(path)
+    replace_atomically(tmp, path)
 
 
 def load_training_state(path: str | Path) -> dict[str, Any] | None:

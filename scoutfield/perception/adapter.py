@@ -80,9 +80,11 @@ class CNNClassifier:
         The calibration knob, expressed *relative to the calibrated point*.
         T = 1 is calibrated, T < 1 overconfident, T > 1 underconfident.
     reference_temperature
-        The temperature fitted on the validation split, which maps the network's
-        raw logits onto calibrated ones. The effective divisor is
-        ``reference_temperature * temperature``.
+        The fitted temperature of the reference condition, which maps the
+        network's raw logits onto calibrated ones: the lab temperature (fitted on
+        PlantVillage validation) or the shift temperature (fitted on PlantDoc
+        ``shift_fit``). The effective divisor is ``reference_temperature *
+        temperature``.
 
         This indirection is what makes the sweep mean the same thing it meant in
         the pilot. The pilot's surrogate reported the exactly calibrated
@@ -122,7 +124,9 @@ class CNNClassifier:
                     "indistinguishable from a measured one. Train the model first "
                     "(experiments/01_finetune_perception.py), or pass a pool directly."
                 )
-            logit_pool = load_or_build_logit_pool(self._checkpoint, split=self.pool_split)
+            # An explicit checkpoint builds the pool locally. Pipeline stages use
+            # `from_store` instead, which reads the pool stage 02 recorded.
+            logit_pool, _ = build_logit_pool(self._checkpoint, split=self.pool_split)
 
         self._pool = {int(k): np.asarray(v, dtype=float).ravel() for k, v in logit_pool.items()}
         if not self._pool or any(v.size == 0 for v in self._pool.values()):
@@ -183,96 +187,124 @@ class CNNClassifier:
         return float(pool[self.rng.integers(pool.size)])
 
 
-def pool_path_for(checkpoint: str | Path, split: str = "test") -> Path:
-    """Where a cached pool is *written* for a given checkpoint and split.
 
-    Not beside the checkpoint. A checkpoint inherited from an earlier notebook is
-    mounted read-only under ``/kaggle/input``, and writing next to it fails with
-    ``OSError: [Errno 30] Read-only file system`` after the pool has already been
-    computed — the expensive part done, then thrown away.
+    @classmethod
+    def from_store(cls, pool_split: str, temperature: float = 1.0,
+                   reference_temperature: float = 1.0,
+                   rng: np.random.Generator | None = None, store=None) -> CNNClassifier:
+        """Build from the logit pool stage 02 pushed for ``pool_split``.
 
-    The writable location mirrors the checkpoint's own grouping directory, so
-    ``.../checkpoints/perception/best.pt`` on the shift split caches to
-    ``<writable>/checkpoints/perception/logit_pool_shift.npz``. Two checkpoint
-    families cannot collide, and neither can two splits.
+        The pool is checked against the split membership recorded in
+        ``calibration_sweep.json`` and rebuilt from the stage 01 checkpoint if it
+        does not match (see ``load_or_build_logit_pool``).
+        """
+        pool = load_or_build_logit_pool(pool_split, store=store)
+        return cls(logit_pool=pool, temperature=temperature, rng=rng,
+                   reference_temperature=reference_temperature, pool_split=pool_split)
+
+
+# ------------------------------------------------------------------- pools
+
+def pool_from_logits(logits, labels, items) -> tuple[dict[int, np.ndarray], dict[int, list]]:
+    """Group one split's logits by true label, with the image each came from.
+
+    ``items`` is the split's ``(path, class)`` list in loader order, which is the
+    order ``collect_logits`` returns logits in (the loaders for held-out splits do
+    not shuffle). Image names are stored so a confident mistake can be traced to
+    the picture that produced it.
     """
-    from scoutfield.utils.paths import checkpoints_dir
+    from scoutfield.perception.datasets import item_key
 
-    return checkpoints_dir(Path(checkpoint).parent.name) / logit_pool_filename(split)
-
-
-def find_logit_pool(checkpoint: str | Path, split: str = "test") -> Path | None:
-    """An existing pool for this checkpoint and split, or None.
-
-    Read and write locations differ once a checkpoint can arrive read-only, so the
-    search covers both: a pool shipped alongside the checkpoint in its mount, and
-    one cached locally by a previous run in this session.
-
-    Only split-keyed names are accepted. A legacy unkeyed ``logit_pool.npz`` is
-    deliberately ignored: its split is unknown, and guessing would reintroduce
-    exactly the condition mismatch the keying exists to prevent.
-    """
-    from scoutfield.utils.paths import find_artifact
-
-    name = logit_pool_filename(split)
-    beside = Path(checkpoint).parent / name
-    written = pool_path_for(checkpoint, split)
-    hit = next((p for p in (beside, written) if p.is_file()), None)
-    # Last resort: a pool cached by an earlier notebook arrives in that notebook's
-    # own mount, which is neither beside this checkpoint nor in this session's
-    # writable directory. Rebuilding instead costs a full forward pass over a split
-    # and, in a notebook with no dataset attached, is not possible at all.
-    return hit or find_artifact(Path(checkpoint).parent.name, name)
+    logits = np.asarray(logits, dtype=float)
+    labels = np.asarray(labels, dtype=int)
+    if len(items) != logits.size:
+        raise ValueError(f"{logits.size} logits for {len(items)} images; the loader and "
+                         f"the item list are out of step")
+    pool = {int(c): logits[labels == c] for c in np.unique(labels)}
+    names = {int(c): [item_key(p) for (p, _), lab in zip(items, labels) if lab == c]
+             for c in np.unique(labels)}
+    return pool, names
 
 
 def save_logit_pool(path: str | Path, pool: dict[int, np.ndarray],
-                    image_paths: dict[int, list[str]] | None = None) -> None:
-    """Persist a pool as npz, keyed by class."""
+                    image_paths: dict[int, list[str]] | None = None,
+                    membership: str | None = None, split: str | None = None) -> None:
+    """Persist a pool as npz, keyed by class, with the split it was built from.
+
+    ``membership`` is the split's membership hash (``datasets.membership_hash``).
+    It travels inside the file, so a pool cannot be mistaken for one built from a
+    different split, whatever its filename says.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {f"logits_{k}": np.asarray(v, dtype=float) for k, v in pool.items()}
-    if image_paths:
-        for k, paths in image_paths.items():
-            payload[f"paths_{k}"] = np.asarray(paths, dtype=object)
+    for k, names in (image_paths or {}).items():
+        payload[f"paths_{k}"] = np.asarray(names, dtype=str)
+    if membership is not None:
+        payload["membership"] = np.asarray(membership)
+    if split is not None:
+        payload["split"] = np.asarray(split)
     np.savez(path, **payload)
 
 
 def load_logit_pool(path: str | Path) -> dict[int, np.ndarray]:
     """Read a pool written by ``save_logit_pool``."""
-    with np.load(path, allow_pickle=True) as data:
+    with np.load(path, allow_pickle=False) as data:
         return {int(k.split("_")[1]): data[k] for k in data.files if k.startswith("logits_")}
 
 
-def load_or_build_logit_pool(checkpoint: str | Path, split: str = "test",
-                             **kwargs) -> dict[int, np.ndarray]:
-    """Return the cached pool for this split if present, otherwise build and cache it."""
-    cached = find_logit_pool(checkpoint, split)
-    if cached is not None:
+def pool_membership(path: str | Path) -> str | None:
+    """The membership hash stored in a pool file, or None for a pool without one."""
+    with np.load(path, allow_pickle=False) as data:
+        return str(data["membership"]) if "membership" in data.files else None
+
+
+def load_or_build_logit_pool(split: str, store=None) -> dict[int, np.ndarray]:
+    """The stage 02 pool for ``split``, verified against the recorded split.
+
+    The expected membership is read from ``calibration_sweep.json`` in the store.
+    A stored pool whose membership matches is used as is. A missing or mismatched
+    pool is rebuilt from the stage 01 checkpoint, which needs the datasets on this
+    machine, and the rebuilt pool must then match the recorded membership; if it
+    does not, the data here is not the data the run used, and that raises.
+    """
+    from scoutfield.utils.artifacts import get_store
+
+    store = store or get_store()
+    calibration = store.pull_json("02_calibration", "calibration_sweep.json")
+    expected = calibration.get("pools", {}).get(split, {}).get("membership")
+    if expected is None:
+        raise KeyError(f"calibration_sweep.json in run {store.run_id} records no pool "
+                       f"for split {split!r}; it has {sorted(calibration.get('pools', {}))}")
+
+    cached = store.pull("02_calibration", logit_pool_filename(split), required=False)
+    if cached is not None and pool_membership(cached) == expected:
         return load_logit_pool(cached)
-    return build_logit_pool(checkpoint, split=split, **kwargs)
+
+    checkpoint = store.pull("01_perception", "best.pt")
+    pool, membership = build_logit_pool(checkpoint, split=split)
+    if membership != expected:
+        raise ValueError(
+            f"the {split!r} split on this machine (membership {membership[:12]}) is not "
+            f"the split run {store.run_id} recorded ({expected[:12]}). The datasets "
+            f"here differ from the ones the run used; attach the same Kaggle datasets."
+        )
+    return pool
 
 
-def build_logit_pool(
-    checkpoint: str | Path,
-    split: str = "test",
-    dataset: str = "plantvillage",
-    config=None,
-) -> dict[int, np.ndarray]:
+def build_logit_pool(checkpoint: str | Path, split: str, config=None,
+                     out_path: str | Path | None = None
+                     ) -> tuple[dict[int, np.ndarray], str]:
     """Run the network once over a split and cache the logits by true label.
 
-    One forward pass over the split, then every subsequent episode samples from
-    the cache. The result is saved next to the checkpoint so a Kaggle session
-    that dies mid-sweep does not recompute it.
-
-    Image paths are stored alongside the logits: when a result looks wrong, being
-    able to see which images produced a confident mistake is the difference
-    between debugging and guessing.
+    Returns ``(pool, membership_hash)``. Written to ``out_path`` (default: the
+    writable checkpoints directory) with the membership inside the file.
     """
     from scoutfield.config import load_config
     from scoutfield.perception.calibrate import _load_model_state, collect_logits
     from scoutfield.perception.datasets import build_dataloaders
     from scoutfield.perception.model import build_model
-    from scoutfield.utils.paths import repo_root
+    from scoutfield.utils.paths import checkpoints_dir, repo_root
 
     if config is None:
         config = load_config(repo_root() / "configs" / "perception.yaml")
@@ -285,16 +317,8 @@ def build_logit_pool(
         raise KeyError(f"unknown split '{split}'; have {sorted(k for k in loaders)}")
 
     logits, labels, _ = collect_logits(model, loaders[split])
-    pool = {int(c): logits[labels == c] for c in np.unique(labels)}
-
-    dataset_items = getattr(loaders[split], "dataset", None)
-    image_paths = None
-    if dataset_items is not None and hasattr(dataset_items, "items"):
-        from scoutfield.perception.datasets import binarise_label
-
-        image_paths = {}
-        for path, cls in dataset_items.items:
-            image_paths.setdefault(binarise_label(cls), []).append(str(path))
-
-    save_logit_pool(pool_path_for(checkpoint, split), pool, image_paths)
-    return pool
+    pool, names = pool_from_logits(logits, labels, loaders[split].dataset.items)
+    membership = loaders["meta"]["membership"][split]
+    out = Path(out_path) if out_path else checkpoints_dir("perception") / logit_pool_filename(split)
+    save_logit_pool(out, pool, names, membership=membership, split=split)
+    return pool, membership

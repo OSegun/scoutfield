@@ -10,6 +10,8 @@ seed: 0
 # non-learned baselines are Lawnmower, Random and GreedyEntropy.
 agents: [lawnmower, random, greedy_entropy, ppo, oracle]
 
+# Relative to the reference temperature below, so T = 1 is the calibrated point.
+# The pilot's grid exactly, so the two phases compare like-for-like.
 temperatures: [0.30, 0.50, 1.00, 2.00, 3.00, 4.00]
 seeds: [0, 1, 2, 3, 4]
 
@@ -25,13 +27,22 @@ seeds: [0, 1, 2, 3, 4]
 # fails when it reaches that job.
 ppo_train_seeds: [0, 1, 2]
 
-# The experimental condition. `shift` = PlantDoc field imagery, where the
-# classifier is overconfident and the precision-for-recall trade this study
-# measures can actually occur. It must match `CALIBRATION_SPLIT` in
-# experiments/04_sweep.py, which pairs each row with the measured ECE for the same
-# split. See docs/METHOD.md, section "2. Perception" -> "BASE_ACC", for why the
-# in-distribution split is the control rather than the experiment.
-pool_split: shift
+# The experimental condition. Planners are scored on the PlantDoc `shift_eval`
+# half, field imagery the classifier was neither trained nor calibrated on. PPO
+# trains on the other half, `shift_fit` (configs/ppo_field32.yaml), so it is never
+# scored on the logits it trained on. Every row records the pool it used, and its
+# ECE is read from the calibration sweep of this same split.
+pool_split: shift_eval
+# Which fitted temperature the grid is relative to: the one fitted on `shift_fit`.
+# Centring on it makes T = 1 calibrated under shift, so the grid covers both the
+# overconfident half (T < 1) and the underconfident half (T > 1), as the pilot's
+# did. The lab-fitted temperature is overconfident under shift, and a grid centred
+# on it never reaches underconfidence.
+reference_condition: shift_fitted
+# Extra conditions, each run once at T = 1 relative to its own fitted temperature
+# and labelled in the CSV. `lab_fitted` is a system calibrated on lab imagery and
+# flown over a field: effective divisor = the lab-fitted temperature.
+named_conditions: [lab_fitted]
 cluster_sigmas: [0.75, 1.50, 3.00]
 
 # Held at the pilot's prevalence — see the note in configs/ppo_field32.yaml.
@@ -40,14 +51,38 @@ offspring_mean: 14
 
 eval_episodes: 20
 
+# Degradation is reported over three spans of the grid, each as the
+# detections-per-joule ratio low / high. The pilot's 13.4x is the full span; most
+# of it lies on the underconfident half. Reporting one span alone, or comparing
+# different spans across the two phases, is not like-for-like.
+degradation_spans:
+  full:            [0.30, 4.00]   # the span of the pilot's 13.4x
+  overconfident:   [0.30, 1.00]   # pilot Lawnmower 1.23x, GreedyEntropy 1.59x
+  underconfident:  [1.00, 4.00]   # pilot Lawnmower 10.86x, GreedyEntropy 1.16x
+
+# Field aggregation at 32x32, measured with the pilot's Morisita index over this
+# many seeds at each cluster scale and written into the sweep summary. 30 matches
+# the seed count of the prevalence check in tests/test_env_parity.py.
+morisita_seeds: 30
+
+# Sensitivity of the effect size to the confirmation threshold tau, which interacts
+# with temperature by construction (docs/METHOD.md, "The tau caveat"). PPO runs a
+# reduced grid at the median cluster scale because its evaluation is far slower than
+# the baselines'; the asymmetry is reported, not hidden.
+tau_sensitivity:
+  tau_grid: [0.55, 0.60, 0.65, 0.70, 0.75, 0.85, 0.90]
+  ppo_tau_grid: [0.60, 0.75, 0.90]
+
 statistics:
   estimator: iqm
   bootstrap_resamples: 10000
   ci: 0.95
   stratify_by: [agent, temperature]
 
-# Resumable, like the pilot's run_jobs.py. Delete results/_done.json to restart
-# cleanly — otherwise the driver resumes and silently mixes old and new results.
+# Resumable, like the pilot's run_jobs.py. The done-registry and the CSV are pushed
+# to the artefact store together (every `push_every_jobs` in configs/artifacts.yaml
+# and at the end of each invocation) and pulled back on start, so a new session
+# resumes exactly where the store says the run is. To start over, use a new run_id.
 runner:
   checkpoint_file: results/_done.json
   output_csv: results/sweep_results.csv

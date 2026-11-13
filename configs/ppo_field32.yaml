@@ -38,12 +38,16 @@ env:
   energy:
     hover: 1.0
     translate: 0.6
-  # Which split the agent observes through during TRAINING. It must match the
-  # evaluation condition in configs/sweep.yaml. A policy trained on one split and
-  # scored on another would be the only planner evaluated away from where it was
-  # fitted — the hand-written baselines have no training distribution to be outside
-  # of — so the comparison would measure the distribution gap, not the planner.
-  pool_split: shift
+  # Which split the agent observes through during TRAINING. PPO trains on the
+  # PlantDoc `shift_fit` half and is scored on `shift_eval` (configs/sweep.yaml), so
+  # the policy never trains on the logits it is evaluated against. Both halves are
+  # the same field condition, so PPO is not the only planner evaluated away from the
+  # distribution it was fitted on; the hand-written baselines have none.
+  pool_split: shift_fit
+  # Which fitted temperature T = 1 means during training: the one fitted on
+  # `shift_fit`, so PPO trains at the shift-calibrated point the sweep centres on.
+  # The other value, `lab_fitted`, is the temperature fitted on PlantVillage val.
+  reference_condition: shift_fitted
   observation:
     # The pilot's agent saw only a 5x5 local patch, which is one of the three named
     # causes of its underperformance. A downsampled global belief map is added here.

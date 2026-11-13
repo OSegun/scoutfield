@@ -26,14 +26,28 @@ from typing import Any
 
 import numpy as np
 
-from scoutfield.analysis.stats import iqm, probability_of_improvement, stratified_bootstrap_ci
+from scoutfield.analysis.stats import (
+    iqm,
+    probability_of_improvement,
+    stratified_bootstrap_ci,
+    stratified_bootstrap_ratio_ci,
+)
 
-METRICS = ("detections_per_joule", "recall", "precision",
-           "coverage", "false_alarms", "time_to_first_detection")
+#: Detections per joule is the primary metric, as in the pilot. It counts only
+#: true positives, so it rewards overconfidence; F1 and false alarms per joule are
+#: the secondary metrics that show the cost (docs/METHOD.md, "Metrics").
+METRICS = ("detections_per_joule", "recall", "precision", "f1",
+           "coverage", "false_alarms", "false_alarms_per_joule",
+           "time_to_first_detection")
 
 #: Sweep columns that are labels, not measurements, and must not be coerced to
 #: float. Every other column is required to be numeric — see ``read_rows``.
-TEXT_COLUMNS = ("agent", "run_id", "pool_split")
+TEXT_COLUMNS = ("agent", "run_id", "pool_split", "reference_condition")
+
+#: The pilot's spans, used when a caller supplies no config. The sweep config's
+#: ``degradation_spans`` is the source of truth.
+DEFAULT_SPANS = {"full": [0.30, 4.00], "overconfident": [0.30, 1.00],
+                 "underconfident": [1.00, 4.00]}
 
 
 def read_rows(csv_path: str | Path) -> list[dict]:
@@ -93,43 +107,79 @@ def _aggregate(values: np.ndarray, strata: np.ndarray, resamples: int, ci: float
             "n": int(values.size), "ci_stratified_by": stratified_by}
 
 
+def _strata(group: list[dict]) -> np.ndarray:
+    """Evaluation seed AND, for a learned planner, the trained policy.
+
+    A PPO cell holds three independently trained policies across five evaluation
+    seeds; treating training-seed variation as evaluation-seed variation resamples
+    across it and narrows the interval, which is the direction that manufactures
+    significance.
+    """
+    return np.array([f"{r['seed']}|{r.get('ppo_train_seed')}" for r in group])
+
+
+def _cell(agent, temperature, condition, group, resamples, ci) -> dict:
+    strata = _strata(group)
+    entry = {"agent": agent, "temperature": temperature,
+             "reference_condition": condition, "n_runs": len(group)}
+    for metric in METRICS:
+        keep = [i for i, r in enumerate(group) if r.get(metric) is not None]
+        if keep:
+            values = np.array([group[i][metric] for i in keep], dtype=float)
+            entry[metric] = _aggregate(values, strata[keep], resamples, ci)
+    # Calibration numbers are carried through, never recomputed here, so the
+    # planner table and the calibration file cannot disagree.
+    for key in ("ece", "signed_calibration_error", "accuracy",
+                "reference_temperature", "effective_divisor"):
+        vals = [r[key] for r in group if r.get(key) is not None]
+        entry[key] = float(np.mean(vals)) if vals else None
+    return entry
+
+
 def build_summary(csv_path: str | Path, config=None) -> dict[str, Any]:
-    """Aggregate a sweep CSV into the structure every figure and document reads."""
+    """Aggregate a sweep CSV into the structure every figure and document reads.
+
+    Rows from the reference condition (the one the temperature grid is relative
+    to) form the ``cells`` keyed ``<agent>@T<t>``, and feed the degradation spans
+    and rankings. Rows from any other condition, such as the lab-fitted one,
+    form ``conditions[<name>][<agent>]`` and are never pooled with the reference
+    rows, even where the two share a temperature label.
+    """
     rows = read_rows(csv_path)
     stats_cfg = (config.section("statistics") if config is not None else {})
     resamples = int(stats_cfg.get("bootstrap_resamples", 10_000))
     ci = float(stats_cfg.get("ci", 0.95))
+    spans = dict(config.get("degradation_spans", DEFAULT_SPANS)) if config is not None \
+        else DEFAULT_SPANS
+    reference = (str(config.get("reference_condition")) if config is not None
+                 and config.get("reference_condition") else None)
+    if reference is None:
+        conditions = {r.get("reference_condition") for r in rows}
+        reference = conditions.pop() if len(conditions) == 1 else None
 
     by_cell: dict[tuple, list[dict]] = defaultdict(list)
+    by_named: dict[tuple, list[dict]] = defaultdict(list)
     for row in rows:
-        by_cell[(row["agent"], row["temperature"])].append(row)
+        condition = row.get("reference_condition")
+        if reference is None or condition in (None, reference):
+            by_cell[(row["agent"], row["temperature"])].append(row)
+        else:
+            by_named[(condition, row["agent"])].append(row)
 
-    cells: dict[str, Any] = {}
-    for (agent, temperature), group in sorted(by_cell.items()):
-        # Stratify by evaluation seed AND, for a learned planner, by which trained
-        # policy produced the row. A PPO cell holds three independently trained
-        # policies across five evaluation seeds; treating training-seed variation
-        # as evaluation-seed variation resamples across it and narrows the
-        # interval, which is the direction that manufactures significance.
-        strata = np.array([f"{r['seed']}|{r.get('ppo_train_seed')}" for r in group])
-        entry = {"agent": agent, "temperature": temperature, "n_runs": len(group)}
-        for metric in METRICS:
-            values = np.array([r[metric] for r in group if r.get(metric) is not None],
-                              dtype=float)
-            if values.size:
-                entry[metric] = _aggregate(values, strata[:values.size], resamples, ci)
-        # Calibration numbers are carried through, never recomputed here, so the
-        # planner table and the calibration file cannot disagree.
-        for key in ("ece", "signed_calibration_error", "accuracy"):
-            vals = [r[key] for r in group if r.get(key) is not None]
-            entry[key] = float(np.mean(vals)) if vals else None
-        cells[f"{agent}@T{temperature:g}"] = entry
+    cells = {f"{agent}@T{t:g}": _cell(agent, t, reference, group, resamples, ci)
+             for (agent, t), group in sorted(by_cell.items())}
+    named: dict[str, dict] = defaultdict(dict)
+    for (condition, agent), group in sorted(by_named.items()):
+        named[condition][agent] = _cell(agent, group[0]["temperature"], condition,
+                                        group, resamples, ci)
 
     return {
         "cells": cells,
+        "conditions": dict(named),
+        "reference_condition": reference,
         "agents": sorted({r["agent"] for r in rows}),
-        "temperatures": sorted({r["temperature"] for r in rows}),
-        "degradation": _degradation(by_cell),
+        "temperatures": sorted({t for _, t in by_cell}),
+        "degradation": _degradation(by_cell, spans, resamples, ci),
         "rankings": _rankings(by_cell),
         "n_rows": len(rows),
         "source_csv": str(Path(csv_path)),
@@ -137,29 +187,49 @@ def build_summary(csv_path: str | Path, config=None) -> dict[str, Any]:
     }
 
 
-def _degradation(by_cell, low: float = 1.0, high: float = 4.0) -> dict:
-    """Per-agent detections-per-joule ratio between the calibrated point and T=4.
+def _degradation(by_cell, spans: dict, resamples: int = 10_000, ci: float = 0.95) -> dict:
+    """Detections-per-joule ratio over each span, per agent, with an interval.
 
-    This is the quantity the pilot reported as 13.4x for Lawnmower and 1.84x for
-    GreedyEntropy.
+    ``spans`` maps a name to ``[low, high]`` temperatures; the ratio is the value
+    at ``low`` over the value at ``high``, so a planner that loses detections per
+    joule as the classifier softens has a ratio above 1. The pilot reported its
+    Lawnmower collapse over the full span, T = 0.3 to 4 (13.41x), which splits
+    into 1.23x on the overconfident half and 10.86x on the underconfident half;
+    reporting all three is what makes the comparison like-for-like.
+
+    Each span carries the IQM at both ends, the ratio, a stratified bootstrap
+    interval on the ratio, and the probability that a run at ``low`` beats a run
+    at ``high``. A span whose temperatures are not in the sweep is skipped.
     """
-    out = {}
-    agents = {agent for agent, _ in by_cell}
-    for agent in sorted(agents):
-        lo_rows = by_cell.get((agent, low))
-        hi_rows = by_cell.get((agent, high))
-        if not lo_rows or not hi_rows:
-            continue
-        lo = np.array([r["detections_per_joule"] for r in lo_rows], dtype=float)
-        hi = np.array([r["detections_per_joule"] for r in hi_rows], dtype=float)
-        lo_p = iqm(lo) if lo.size >= 4 else float(lo.mean())
-        hi_p = iqm(hi) if hi.size >= 4 else float(hi.mean())
-        out[agent] = {
-            f"T{low:g}": lo_p,
-            f"T{high:g}": hi_p,
-            "ratio": (lo_p / hi_p) if hi_p > 0 else None,
-            "probability_of_improvement_T1_over_T4": probability_of_improvement(lo, hi),
-        }
+    out: dict[str, dict] = {}
+    agents = sorted({agent for agent, _ in by_cell})
+    for name, (low, high) in spans.items():
+        low, high = float(low), float(high)
+        entry = {"low": low, "high": high, "agents": {}}
+        for agent in agents:
+            lo_rows = by_cell.get((agent, low))
+            hi_rows = by_cell.get((agent, high))
+            if not lo_rows or not hi_rows:
+                continue
+            lo = np.array([r["detections_per_joule"] for r in lo_rows], dtype=float)
+            hi = np.array([r["detections_per_joule"] for r in hi_rows], dtype=float)
+            lo_p = iqm(lo) if lo.size >= 4 else float(lo.mean())
+            hi_p = iqm(hi) if hi.size >= 4 else float(hi.mean())
+            result = {
+                f"T{low:g}": lo_p,
+                f"T{high:g}": hi_p,
+                "ratio": (lo_p / hi_p) if hi_p > 0 else None,
+                "probability_of_improvement": probability_of_improvement(lo, hi),
+                "ci_low": None, "ci_high": None, "ci_stratified_by": None,
+            }
+            if lo.size >= 4 and hi.size >= 4:
+                c_lo, c_hi, by = stratified_bootstrap_ratio_ci(
+                    lo, _strata(lo_rows), hi, _strata(hi_rows),
+                    resamples=resamples, ci=ci)
+                result.update(ci_low=c_lo, ci_high=c_hi, ci_stratified_by=by)
+            entry["agents"][agent] = result
+        if entry["agents"]:
+            out[name] = entry
     return out
 
 

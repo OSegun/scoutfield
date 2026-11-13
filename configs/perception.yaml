@@ -56,7 +56,18 @@ train:
 
 calibration:
   # Fitted on the validation split by minimising NLL, per Guo et al. (2017).
+  # This is the LAB temperature (`lab_fitted_temperature`).
   fit_temperature_on: val
+  # A temperature fitted on lab imagery is overconfident under field shift, so a
+  # sweep centred on it never reaches underconfidence. PlantDoc is therefore halved:
+  # `shift_fit` fits the SHIFT temperature by the same NLL method, and `shift_eval`
+  # is what the planners are scored on, so no image both fits the calibration point
+  # and is evaluated against it. Half each way: the shift set is small, and the fit
+  # needs only one scalar while the evaluation needs a pool per class.
+  shift_fit_fraction: 0.5
+  # Seed for that split, separate from the training seed so changing one does not
+  # silently move the other.
+  shift_split_seed: 0
   # Swept afterwards to reproduce the pilot's instrument on a real classifier.
   # Accuracy MUST be invariant across this sweep to 4 d.p.
   temperature_sweep: [0.30, 0.50, 1.00, 2.00, 3.00, 4.00]

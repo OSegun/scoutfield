@@ -149,23 +149,26 @@ def make_field_env(config, seed: int = 0, temperature: float = 1.0,
 
     if classifier is None:
         from scoutfield.perception.adapter import CNNClassifier
-        from scoutfield.utils.paths import find_checkpoint
 
-        # Not `checkpoints_dir(...)`: PPO training and the sweep run in later
-        # notebooks, where notebook 01's checkpoint is mounted read-only under
-        # /kaggle/input rather than sitting in this session's writable directory.
-        checkpoint = checkpoint or find_checkpoint("perception", "best.pt")
-        # Which split the agent observes through is an experimental condition, not
-        # a detail: `test` is in-distribution (near-perfect, almost no calibration
-        # error to consume), `shift` is PlantDoc field imagery (overconfident). It
-        # lives in the config so a run records which one it was.
-        classifier = CNNClassifier(
-            checkpoint=checkpoint,
-            temperature=temperature,
-            reference_temperature=_reference_temperature(),
-            rng=np.random.default_rng(seed),
-            pool_split=str(env_cfg.get("pool_split", "test")),
-        )
+        # Which split the agent observes through, and which fitted temperature the
+        # sweep is relative to, are experimental conditions, not details. Both live
+        # in the config so a run records which ones it was.
+        condition = str(env_cfg["reference_condition"])
+        if checkpoint is not None:
+            classifier = CNNClassifier(
+                checkpoint=checkpoint,
+                temperature=temperature,
+                reference_temperature=_reference_temperature(condition),
+                rng=np.random.default_rng(seed),
+                pool_split=str(env_cfg["pool_split"]),
+            )
+        else:
+            classifier = CNNClassifier.from_store(
+                str(env_cfg["pool_split"]),
+                temperature=temperature,
+                reference_temperature=_reference_temperature(condition),
+                rng=np.random.default_rng(seed),
+            )
     else:
         classifier.set_temperature(temperature)
 
@@ -194,22 +197,37 @@ def make_field_env(config, seed: int = 0, temperature: float = 1.0,
     return FieldScoutEnv(field, classifier, **kwargs)
 
 
-def _reference_temperature() -> float:
-    """The temperature fitted on validation, read from the calibration results.
+#: The two calibration points stage 02 fits, and the key each is stored under.
+REFERENCE_CONDITIONS = {
+    "lab_fitted": "lab_fitted_temperature",
+    "shift_fitted": "shift_fitted_temperature",
+}
 
-    Read rather than passed so the planner sweep and the calibration run cannot
-    disagree about where the calibrated point is. Falls back to 1.0 only when
-    calibration has not been run, which is the case during environment tests.
+
+def _reference_temperature(condition: str, required: bool = True, store=None) -> float:
+    """The fitted temperature for ``condition``, read from stage 02 in the store.
+
+    ``lab_fitted`` is the temperature fitted on PlantVillage validation;
+    ``shift_fitted`` the one fitted on PlantDoc ``shift_fit``. Read rather than
+    passed, so the planner sweep and the calibration run cannot disagree about
+    where the calibrated point is. A missing calibration file raises.
+    ``required=False`` returns 1.0 instead, and exists only for environment tests
+    that ask for it explicitly.
     """
-    import json
+    if condition not in REFERENCE_CONDITIONS:
+        raise KeyError(f"unknown reference condition {condition!r}; "
+                       f"have {sorted(REFERENCE_CONDITIONS)}")
+    from scoutfield.utils.artifacts import get_store
 
-    from scoutfield.utils.paths import results_dir
-
-    path = results_dir() / "calibration_sweep.json"
-    if not path.exists():
+    store = store or get_store()
+    data = store.pull_json("02_calibration", "calibration_sweep.json", required=required)
+    if data is None:
         return 1.0
-    with path.open("r", encoding="utf-8") as fh:
-        return float(json.load(fh).get("fitted_temperature", 1.0))
+    key = REFERENCE_CONDITIONS[condition]
+    if key not in data:
+        raise KeyError(f"calibration_sweep.json in run {store.run_id} has no {key!r}; "
+                       "it was written by an older stage 02. Re-run stage 02.")
+    return float(data[key])
 
 
 def coverage_ceiling(grid: int, budget: float, e_hover: float = 1.0,

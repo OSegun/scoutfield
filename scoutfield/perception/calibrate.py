@@ -6,13 +6,15 @@ Run:
 
 Three things happen here, in order
 ----------------------------------
-1. **Fit T on the validation split** by minimising NLL with the network frozen
-   (Guo et al., 2017). This gives the model's *actual* calibration state and is
-   the T = 1 reference point of the sweep.
+1. **Fit two temperatures** by minimising NLL with the network frozen (Guo et al.,
+   2017): the *lab* temperature on PlantVillage validation, and the *shift*
+   temperature on the PlantDoc ``shift_fit`` half. A lab-fitted temperature is
+   overconfident under field shift, so only the shift-fitted one makes T = 1 the
+   calibrated point for the condition the planners are scored on.
 
-2. **Sweep T** over the configured range to reproduce the pilot's instrument on a
-   real classifier. This is the step that tests whether the pilot's effect was an
-   artefact of the Gaussian surrogate. The invariant below must hold.
+2. **Sweep T** relative to each fitted temperature to reproduce the pilot's
+   instrument on a real classifier. The invariant below must hold on every sweep,
+   and on ``shift_eval`` the signed error must change sign at T = 1.
 
 3. **MC-dropout and deep ensembles** as alternative uncertainty estimates
    (roadmap item 7), evaluated on the same axis so the three are comparable.
@@ -35,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 import numpy as np
 
@@ -252,47 +255,124 @@ def summarise(logits, labels, temperatures, fitted_t: float, bins: int = 15) -> 
     }
 
 
-def run(config, checkpoint=None) -> dict:
-    """Fit the temperature, sweep it on every split, and write the results file.
+#: Which fitted temperature each sweep is relative to, and which split it runs on.
+#: ``shift_eval`` relative to the shift temperature is the condition the planner
+#: sweep uses; ``shift_eval_lab`` is the same images relative to the lab
+#: temperature, the condition a system calibrated in the lab meets in the field.
+SWEEPS = {
+    "val": ("val", "lab_fitted"),
+    "test": ("test", "lab_fitted"),
+    "shift_eval": ("shift_eval", "shift_fitted"),
+    "shift_eval_lab": ("shift_eval", "lab_fitted"),
+}
 
-    The planner sweep reads its temperatures and measured ECEs from
-    ``results/calibration_sweep.json`` rather than recomputing them, so the two
-    phases cannot disagree about what T = 4 meant.
+#: Pools the planners sample from: PPO trains on ``shift_fit``, the sweep scores
+#: on ``shift_eval``, and ``test`` is the in-distribution control.
+POOL_SPLITS = ("shift_fit", "shift_eval", "test")
+
+
+def check_sign_change(sweep: dict, name: str = "shift_eval") -> None:
+    """Signed error must be positive below T = 1 and negative above it.
+
+    This is what centring the sweep on the shift-fitted temperature is for: T = 1
+    is then the calibrated point under shift, so sharpening (T < 1) is
+    overconfident and softening (T > 1) underconfident. If the sign does not flip,
+    the sweep does not straddle the calibrated point and the comparison with the
+    pilot's two halves is not like-for-like. Raises rather than continuing.
     """
+    bad = []
+    for key, row in sweep.items():
+        t, err = float(key), row["signed_calibration_error"]
+        if (t < 1.0 and not err > 0) or (t > 1.0 and not err < 0):
+            bad.append((t, err))
+    if bad:
+        raise AssertionError(
+            f"signed calibration error on {name} does not change sign at T = 1: "
+            + ", ".join(f"T={t:g} -> {e:+.4f}" for t, e in sorted(bad))
+            + ". The sweep is not centred on the calibrated point; stop here."
+        )
+
+
+def run(config, checkpoint=None, store=None) -> dict:
+    """Fit both temperatures, sweep every condition, build the pools, push them.
+
+    Reads the stage 01 checkpoint from the store unless ``checkpoint`` names a
+    local file. Writes ``results/calibration_sweep.json`` and the three logit
+    pools, and pushes all four to stage ``02_calibration``. The planner sweep reads
+    its reference temperature and its ECE column from that file, so the two
+    stages cannot disagree about what a temperature meant.
+    """
+    from scoutfield.perception.adapter import (
+        logit_pool_filename,
+        pool_from_logits,
+        save_logit_pool,
+    )
     from scoutfield.perception.datasets import build_dataloaders
     from scoutfield.perception.model import build_model
-    from scoutfield.utils.paths import find_checkpoint, results_dir
+    from scoutfield.utils.artifacts import get_store, git_commit, sha256_of
+    from scoutfield.utils.paths import checkpoints_dir, results_dir
 
+    store = store or get_store()
     cal_cfg = config.section("calibration")
     bins = int(cal_cfg.get("ece_bins", 15))
     temperatures = [float(t) for t in cal_cfg["temperature_sweep"]]
 
-    # Not `checkpoints_dir(...)`: this notebook consumes what notebook 01 wrote, and
-    # on Kaggle that arrives read-only under /kaggle/input, not in this session's
-    # writable directory. See `find_checkpoint`.
-    checkpoint = checkpoint or find_checkpoint("perception", "best.pt")
+    checkpoint = Path(checkpoint) if checkpoint else store.pull("01_perception", "best.pt")
     model = build_model(config)
     model.load_state_dict(_load_model_state(checkpoint))
 
     loaders = build_dataloaders(config)
-    val_logits, val_labels, _ = collect_logits(model, loaders["val"])
-    fitted_t = fit_temperature(val_logits, val_labels)
+    membership = loaders["meta"]["membership"]
+    needed = {split for split, _ in SWEEPS.values()} | set(POOL_SPLITS)
+    collected = {split: collect_logits(model, loaders[split]) for split in sorted(needed)}
+
+    fitted = {
+        "lab_fitted": fit_temperature(*collected["val"][:2]),
+        "shift_fitted": fit_temperature(*collected["shift_fit"][:2]),
+    }
+
+    sweeps = {}
+    for name, (split, condition) in SWEEPS.items():
+        logits, labels, _ = collected[split]
+        entry = summarise(logits, labels, temperatures, fitted[condition], bins)
+        entry["split"] = split
+        entry["relative_to"] = condition
+        entry["membership"] = membership[split]
+        sweeps[name] = entry
+    check_sign_change(sweeps["shift_eval"]["sweep"])
+
+    pool_files, pools = [], {}
+    for split in POOL_SPLITS:
+        logits, labels, _ = collected[split]
+        pool, names = pool_from_logits(logits, labels, loaders[split].dataset.items)
+        path = checkpoints_dir("perception") / logit_pool_filename(split)
+        save_logit_pool(path, pool, names, membership=membership[split], split=split)
+        pool_files.append(path)
+        pools[split] = {"membership": membership[split],
+                        "n_by_class": {str(k): int(v.size) for k, v in pool.items()}}
 
     out = {
+        "lab_fitted_temperature": fitted["lab_fitted"],
+        "shift_fitted_temperature": fitted["shift_fitted"],
+        "sweep_is_relative_to_fitted_temperature": True,
+        "sweeps": sweeps,
+        "pools": pools,
+        "membership": membership,
+        "split_sizes": {k: v["n"] for k, v in loaders["meta"].items()
+                        if isinstance(v, dict) and "n" in v},
+        "checkpoint_sha256": sha256_of(checkpoint),
         "config": str(config.path),
-        "checkpoint": str(checkpoint),
-        "fitted_temperature": fitted_t,
-        "splits": {"val": summarise(val_logits, val_labels, temperatures, fitted_t, bins)},
+        "git_commit": git_commit(),
     }
-    for split in ("test", "shift"):
-        logits, labels, _ = collect_logits(model, loaders[split])
-        out["splits"][split] = summarise(logits, labels, temperatures, fitted_t, bins)
-
     path = results_dir() / "calibration_sweep.json"
     with path.open("w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=2)
-    print(f"fitted temperature: {fitted_t:.4f}")
-    print(f"wrote {path}")
+    print(f"lab-fitted temperature:   {fitted['lab_fitted']:.4f}")
+    print(f"shift-fitted temperature: {fitted['shift_fitted']:.4f}")
+
+    store.push("02_calibration", [path, *pool_files], "calibration sweep and logit pools")
+    store.record_inputs("02_calibration")
+    print(f"pushed {path.name} and {len(pool_files)} pools to run {store.run_id}")
     return out
 
 

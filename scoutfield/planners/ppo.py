@@ -59,12 +59,13 @@ class PPOPlanner:
         return int(action)
 
 
-def _make_info_callback():
+def _make_info_callback(episodes: list[dict] | None = None):
     """A callback recording the full ``info`` dict at every episode end.
 
     Episode return is not the quantity the paper reports — detections-per-joule
     is — so logging only the return would leave the learning curve measuring
-    something other than the result.
+    something other than the result. ``episodes`` seeds the record with what a
+    resumed run had already logged, so the curve covers the whole of training.
 
     Built inside a function rather than at module scope so that importing this
     module does not require SB3.
@@ -74,7 +75,7 @@ def _make_info_callback():
     class _InfoDictCallback(BaseCallback):
         def __init__(self, verbose: int = 0):
             super().__init__(verbose)
-            self.episodes: list[dict] = []
+            self.episodes: list[dict] = list(episodes or [])
 
         def _on_step(self) -> bool:
             for done, info in zip(self.locals.get("dones", []),
@@ -92,22 +93,60 @@ def _make_info_callback():
     return _InfoDictCallback()
 
 
-def _env_factory(config, base_seed: int, rank: int, temperature: float, classifier=None):
+def _make_push_callback(every: int, push):
+    """A callback calling ``push()`` every ``every`` timesteps.
+
+    ``push`` saves the resume state and the curve so far and uploads both, so a
+    session killed mid-training loses at most ``every`` steps.
+    """
+    from stable_baselines3.common.callbacks import BaseCallback
+
+    class _PushCallback(BaseCallback):
+        def __init__(self):
+            super().__init__(0)
+            self.last = None
+
+        def _on_step(self) -> bool:
+            if self.last is None:
+                self.last = self.num_timesteps
+            if self.num_timesteps - self.last >= every:
+                self.last = self.num_timesteps
+                push(self.model)
+            return True
+
+    return _PushCallback()
+
+
+def _env_factory(config, base_seed: int, rank: int, temperature: float,
+                 classifier=None, pool=None, reference_temperature: float = 1.0,
+                 pool_split: str = ""):
     """A picklable zero-argument factory for one subprocess environment.
 
-    Each rank gets a distinct seed. Sharing one env instance across subprocesses
-    would correlate the runs and silently narrow the confidence intervals.
+    Each rank gets a distinct seed, and its own classifier with its own generator.
+    A single classifier pickled into every subprocess would carry the same
+    generator state into each, so every rank would draw the same logits: the
+    runs would be correlated and the confidence intervals silently too narrow.
     """
     from scoutfield.envs.field_env import make_field_env
     from scoutfield.envs.gym_wrapper import GymScoutEnv
 
     def _init():
+        clf = classifier
+        if clf is None:
+            import numpy as np
+
+            from scoutfield.perception.adapter import CNNClassifier
+
+            clf = CNNClassifier(logit_pool=pool, temperature=temperature,
+                                reference_temperature=reference_temperature,
+                                rng=np.random.default_rng(base_seed + rank),
+                                pool_split=pool_split)
         return GymScoutEnv(
             lambda seed=None: make_field_env(
                 config,
                 seed=base_seed + rank if seed is None else seed,
                 temperature=temperature,
-                classifier=classifier,
+                classifier=clf,
             ),
             seed=base_seed + rank,
         )
@@ -115,31 +154,22 @@ def _env_factory(config, base_seed: int, rank: int, temperature: float, classifi
     return _init
 
 
-def _warm_logit_pool_cache(split: str = "test") -> None:
-    """Build the classifier's logit pool once, here, before any subprocess starts.
-
-    Leaving it to the workers fails outright. ``SubprocVecEnv`` workers are daemonic,
-    and building the pool runs a ``DataLoader`` with worker processes of its own; a
-    daemonic process may not have children, so the build dies with ``AssertionError:
-    daemonic processes are not allowed to have children`` and takes the whole vec-env
-    handshake with it.
-
-    It would also be wasteful if it did work: every rank would run the same full
-    forward pass over the split to arrive at byte-identical logits.
-
-    Building here leaves the cache on disk, so each worker loads it instead. The pool
-    must be identical across workers and temperatures anyway — that is what makes the
-    sweep isolate calibration rather than sampling noise.
-    """
-    from scoutfield.perception.adapter import load_or_build_logit_pool
-    from scoutfield.utils.paths import find_checkpoint
-
-    load_or_build_logit_pool(find_checkpoint("perception", "best.pt"), split=split)
-
-
 def train_ppo(config, seed: int | None = None, classifier=None,
-              total_timesteps: int | None = None) -> Path:
-    """Train to convergence and return the checkpoint path.
+              total_timesteps: int | None = None, store=None) -> Path:
+    """Train to convergence and return the local path of the final policy.
+
+    The policy, its resume state and its learning curve live in stage ``03_ppo``
+    of the artefact store:
+
+    * a seed whose final policy is already in the store is skipped;
+    * a seed with resume state continues from it, so a killed session is resumed
+      by running the notebook again;
+    * resume state and the curve so far are pushed every ``ppo.checkpoint_freq``
+      timesteps.
+
+    Training runs at sweep T = 1 relative to ``env.reference_condition`` (the
+    shift-fitted temperature), on the ``env.pool_split`` pool. Both, and the
+    effective divisor, are written into the curve file.
 
     Convergence means the evaluation curve is flat over the last ~20% of training
     on every seed. Stopping at a fixed step count and calling it converged is the
@@ -152,43 +182,84 @@ def train_ppo(config, seed: int | None = None, classifier=None,
     numbers look better.
     """
     from stable_baselines3 import PPO
-    from stable_baselines3.common.callbacks import CheckpointCallback
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 
+    from scoutfield.utils.artifacts import get_store, git_commit
     from scoutfield.utils.paths import checkpoints_dir, results_dir
 
+    store = store or get_store()
     ppo_cfg = config.section("ppo")
+    env_cfg = config.section("env")
     seed = int(config["seed"] if seed is None else seed)
     total_timesteps = int(total_timesteps or ppo_cfg["total_timesteps"])
     n_envs = int(ppo_cfg["n_envs"])
+    every = int(ppo_cfg["checkpoint_freq"])
 
-    ckpt_dir = checkpoints_dir("ppo")
     run_name = f"ppo_seed{seed}"
-    final_path = ckpt_dir / f"{run_name}.zip"
-    resume_path = ckpt_dir / f"{run_name}_resume.zip"
+    final_name, resume_name = f"{run_name}.zip", f"{run_name}_resume.zip"
+    curve_name = f"ppo_curve_seed{seed}.json"
+    ckpt_dir = checkpoints_dir("ppo")
+    final_path, resume_path = ckpt_dir / final_name, ckpt_dir / resume_name
+    curve_path = results_dir() / curve_name
 
+    if store.has("03_ppo", final_name):
+        curve = store.pull_json("03_ppo", curve_name, required=False) or {}
+        if curve.get("complete") and curve.get("total_timesteps") == total_timesteps:
+            print(f"{final_name} is already complete in run {store.run_id}; skipping")
+            return store.pull("03_ppo", final_name)
+
+    pool_split = str(env_cfg["pool_split"])
+    condition = str(env_cfg["reference_condition"])
     if classifier is None:
-        _warm_logit_pool_cache(str(config.section("env").get("pool_split", "test")))
+        from scoutfield.envs.field_env import _reference_temperature
+        from scoutfield.perception.adapter import load_or_build_logit_pool
 
-    factories = [_env_factory(config, seed * 1000, r, 1.0, classifier)
+        # Resolved here, in the main process, before any subprocess starts:
+        # SubprocVecEnv workers are daemonic and cannot run the DataLoader a pool
+        # rebuild needs, and every rank needs the identical pool anyway.
+        reference_temperature = _reference_temperature(condition, store=store)
+        pool = load_or_build_logit_pool(pool_split, store=store)
+        store.record_inputs("03_ppo")
+    else:
+        reference_temperature = float(getattr(classifier, "reference_temperature", 1.0))
+        pool = None
+    training_temperature = 1.0
+
+    metadata = {
+        "seed": seed,
+        "total_timesteps": total_timesteps,
+        "pool_split": pool_split,
+        "reference_condition": condition,
+        "reference_temperature": reference_temperature,
+        "temperature": training_temperature,
+        "effective_divisor": reference_temperature * training_temperature,
+        "git_commit": git_commit(),
+    }
+
+    factories = [_env_factory(config, seed * 1000, r, training_temperature, classifier,
+                              pool, reference_temperature, pool_split)
                  for r in range(n_envs)]
     # SubprocVecEnv only pays for itself with several environments, and it needs a
     # __main__ guard on Windows; a single env is cheaper in-process.
     vec_cls = SubprocVecEnv if n_envs > 1 else DummyVecEnv
     venv = vec_cls(factories)
 
-    try:
-        info_cb = _make_info_callback()
-        checkpoint_cb = CheckpointCallback(
-            save_freq=max(int(ppo_cfg["checkpoint_freq"]) // n_envs, 1),
-            save_path=str(ckpt_dir),
-            name_prefix=run_name,
-        )
+    def write_curve(episodes, complete: bool, resumed_from: int | None) -> None:
+        with curve_path.open("w", encoding="utf-8") as fh:
+            json.dump({**metadata, "complete": complete,
+                       "resumed_from_timestep": resumed_from,
+                       "episodes": episodes,
+                       "converged": _is_flat(episodes) if complete else None}, fh, indent=2)
 
-        if resume_path.exists():
-            # A killed Kaggle session resumes rather than restarting.
-            model = PPO.load(resume_path, env=venv, device="auto")
-            print(f"resumed from {resume_path}")
+    try:
+        resumed_from, episodes = None, []
+        if store.has("03_ppo", resume_name):
+            # A killed session resumes rather than restarting.
+            model = PPO.load(store.pull("03_ppo", resume_name), env=venv, device="auto")
+            partial = store.pull_json("03_ppo", curve_name, required=False) or {}
+            episodes = list(partial.get("episodes", []))
+            resumed_from = int(model.num_timesteps)
+            print(f"resumed {run_name} at timestep {resumed_from}")
         else:
             model = PPO(
                 ppo_cfg.get("policy", "MlpPolicy"),
@@ -208,23 +279,29 @@ def train_ppo(config, seed: int | None = None, classifier=None,
                 verbose=1,
             )
 
-        model.learn(total_timesteps=total_timesteps,
-                    callback=[checkpoint_cb, info_cb],
-                    reset_num_timesteps=not resume_path.exists())
+        info_cb = _make_info_callback(episodes)
+
+        def push_resume(m) -> None:
+            m.save(resume_path)
+            write_curve(info_cb.episodes, complete=False, resumed_from=resumed_from)
+            store.push("03_ppo", [resume_path, curve_path],
+                       f"{run_name} at timestep {m.num_timesteps}")
+
+        remaining = total_timesteps - int(model.num_timesteps)
+        if remaining > 0:
+            # On a resumed model SB3 adds `total_timesteps` to the steps already
+            # taken, so only the remainder is passed.
+            model.learn(total_timesteps=remaining,
+                        callback=[info_cb, _make_push_callback(every, push_resume)],
+                        reset_num_timesteps=resumed_from is None)
         model.save(final_path)
         model.save(resume_path)
     finally:
         venv.close()
 
-    curve_path = results_dir() / f"ppo_curve_seed{seed}.json"
-    with curve_path.open("w", encoding="utf-8") as fh:
-        json.dump({
-            "seed": seed,
-            "total_timesteps": total_timesteps,
-            "episodes": info_cb.episodes,
-            "converged": _is_flat(info_cb.episodes),
-        }, fh, indent=2)
-    print(f"wrote {curve_path}")
+    write_curve(info_cb.episodes, complete=True, resumed_from=resumed_from)
+    store.push("03_ppo", [final_path, resume_path, curve_path], f"{run_name} complete")
+    print(f"pushed {final_name} and {curve_name} to run {store.run_id}")
     return final_path
 
 

@@ -25,23 +25,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 
 import numpy as np
-
-
-def _git_commit() -> str:
-    """Current commit, so a summary can be traced back to the code that made it."""
-    try:
-        from scoutfield.utils.paths import repo_root
-
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=repo_root(), capture_output=True, text=True, check=True, timeout=10,
-        )
-        return out.stdout.strip()
-    except Exception:  # noqa: BLE001 - provenance is best-effort; never fail a run over it
-        return "unknown"
 
 
 def _build_optimizer(model, train_cfg):
@@ -73,12 +58,22 @@ def _evaluate(model, loader, device, bins: int):
     return evaluate_at_temperature(logits, labels, temperature=1.0, bins=bins), logits, labels
 
 
-def train(config) -> dict:
+class ResumeRefused(RuntimeError):
+    """Resume state exists but resuming was not asked for."""
+
+
+def train(config, resume: bool = False, store=None) -> dict:
     """Fine-tune and return a summary dict.
 
-    The summary is written to ``results/perception_summary.json`` and is the only
-    place downstream code reads these numbers from — nothing hard-codes an
-    accuracy or an ECE.
+    The summary is written to ``results/perception_summary.json`` and pushed with
+    the checkpoints to stage ``01_perception``; downstream stages read these
+    numbers from there and nothing hard-codes an accuracy or an ECE.
+
+    ``last.pt`` (model, optimizer, scheduler, scaler and RNG states) is pushed to
+    the store after every epoch, so a killed session loses at most one epoch.
+    With ``resume=True`` training continues from that file. Without it, an
+    existing ``last.pt`` in the store or on disk refuses the run: silently
+    starting over would overwrite a partially trained model.
     """
     import torch
     from torch import nn
@@ -90,6 +85,7 @@ def train(config) -> dict:
     )
     from scoutfield.perception.datasets import build_dataloaders
     from scoutfield.perception.model import build_model
+    from scoutfield.utils.artifacts import get_store, git_commit
     from scoutfield.utils.checkpoint import (
         load_training_state,
         restore_rng_state,
@@ -99,6 +95,27 @@ def train(config) -> dict:
     from scoutfield.utils.device import select_device
     from scoutfield.utils.paths import checkpoints_dir, repo_root, results_dir
     from scoutfield.utils.seeding import seed_everything
+
+    store = store or get_store()
+    ckpt_dir = checkpoints_dir("perception")
+    last_path, best_path = ckpt_dir / "last.pt", ckpt_dir / "best.pt"
+    if not resume:
+        if store.has("01_perception", "last.pt") or last_path.exists():
+            raise ResumeRefused(
+                f"resume state already exists for run {store.run_id} "
+                f"(01_perception/last.pt in the store, or {last_path}). Pass --resume "
+                "(notebook 01: RESUME = True) to continue that run, or set a new "
+                "run_id in configs/artifacts.yaml to start a separate one."
+            )
+    else:
+        import shutil
+
+        pulled = store.pull("01_perception", "last.pt")
+        ckpt_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(pulled, last_path)
+        best = store.pull("01_perception", "best.pt", required=False)
+        if best is not None:
+            shutil.copyfile(best, best_path)
 
     seed = int(config["seed"])
     seed_everything(seed)
@@ -129,11 +146,8 @@ def train(config) -> dict:
     use_amp = bool(train_cfg.get("amp", True)) and device == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
-    ckpt_dir = checkpoints_dir("perception")
-    last_path, best_path = ckpt_dir / "last.pt", ckpt_dir / "best.pt"
-
     start_epoch, history, best_metric = 0, [], -float("inf")
-    resumed = load_training_state(last_path)
+    resumed = load_training_state(last_path) if resume else None
     if resumed is not None:
         model.load_state_dict(resumed["model"])
         optimizer.load_state_dict(resumed["optimizer"])
@@ -201,7 +215,8 @@ def train(config) -> dict:
                 "config": str(config.path),
             })
 
-        if test_metrics["accuracy"] > best_metric:
+        improved = test_metrics["accuracy"] > best_metric
+        if improved:
             best_metric = test_metrics["accuracy"]
             save_training_state(best_path, {
                 "epoch": epoch,
@@ -209,6 +224,19 @@ def train(config) -> dict:
                 "test_accuracy": best_metric,
                 "config": str(config.path),
             })
+            # last.pt was saved before this update, so it is rewritten to carry the
+            # new best_metric: otherwise a resumed run could re-save an equal epoch
+            # as "best".
+            last_state = load_training_state(last_path)
+            if last_state is not None:
+                last_state["best_metric"] = best_metric
+                save_training_state(last_path, last_state)
+
+        # Pushed every epoch: a session that dies loses one epoch, not the run.
+        if last_path.exists():
+            store.push("01_perception",
+                       [last_path, best_path] if improved else [last_path],
+                       f"epoch {epoch}")
 
     best_state = load_training_state(best_path)
     if best_state is not None:
@@ -218,24 +246,33 @@ def train(config) -> dict:
     fitted_t = fit_temperature(val_logits, val_labels)
 
     test_logits, test_labels, _ = collect_logits(model, loaders["test"], device=device)
-    shift_logits, shift_labels, _ = collect_logits(model, loaders["shift"], device=device)
+    fit_logits, fit_labels, _ = collect_logits(model, loaders["shift_fit"], device=device)
+    eval_logits, eval_labels, _ = collect_logits(model, loaders["shift_eval"], device=device)
+    shift_logits = np.concatenate([fit_logits, eval_logits])
+    shift_labels = np.concatenate([fit_labels, eval_labels])
     test_at_t = evaluate_at_temperature(test_logits, test_labels, fitted_t, bins)
     shift_at_t = evaluate_at_temperature(shift_logits, shift_labels, fitted_t, bins)
+    shift_eval_at_t = evaluate_at_temperature(eval_logits, eval_labels, fitted_t, bins)
 
     summary = {
-        # Replaces the pilot's cited BASE_ACC of 0.816 with a measured value.
+        # In-distribution (PlantVillage test) accuracy: the control condition.
         "accuracy": test_at_t["accuracy"],
+        # All of PlantDoc, and the shift_eval half the planners are scored on.
+        # BASE_ACC is the shift_eval accuracy; see docs/METHOD.md, "BASE_ACC".
         "accuracy_shift": shift_at_t["accuracy"],
+        "accuracy_shift_eval": shift_eval_at_t["accuracy"],
         "ece": test_at_t["ece"],
         "ece_shift": shift_at_t["ece"],
         "signed_calibration_error": test_at_t["signed_calibration_error"],
         "signed_calibration_error_shift": shift_at_t["signed_calibration_error"],
-        "fitted_temperature": fitted_t,
+        # Lab-fitted, on PlantVillage validation. Stage 02 fits the shift
+        # temperature and is the authoritative source for both.
+        "lab_fitted_temperature": fitted_t,
         "best_epoch": int(best_state["epoch"]) if best_state else None,
         "history": history,
         "splits": loaders["meta"],
         "config": str(config.path),
-        "git_commit": _git_commit(),
+        "git_commit": git_commit(),
         "seed": seed,
         "device": device,
     }
@@ -245,6 +282,7 @@ def train(config) -> dict:
         json.dump(summary, fh, indent=2, default=lambda o: o.tolist()
                   if isinstance(o, np.ndarray) else str(o))
     print(f"wrote {out}  (repo root {repo_root()})")
+    store.push("01_perception", [best_path, last_path, out], "fine-tune complete")
     return summary
 
 
@@ -252,21 +290,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="configs/perception.yaml")
     parser.add_argument("--resume", action="store_true",
-                        help="resume from the last epoch checkpoint")
+                        help="continue from 01_perception/last.pt in the store")
     args = parser.parse_args()
 
     from scoutfield.config import load_config
-    from scoutfield.utils.paths import checkpoints_dir
 
-    if not args.resume:
-        last = checkpoints_dir("perception") / "last.pt"
-        if last.exists():
-            raise SystemExit(
-                f"{last} exists. Pass --resume to continue that run, or move the file "
-                "aside to start fresh — silently overwriting it would discard a "
-                "partially trained model."
-            )
-    train(load_config(args.config))
+    try:
+        train(load_config(args.config), resume=args.resume)
+    except ResumeRefused as exc:
+        raise SystemExit(str(exc)) from exc
 
 
 if __name__ == "__main__":

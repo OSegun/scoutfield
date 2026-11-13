@@ -45,23 +45,39 @@ class ScoutPlanInference:
 
     @classmethod
     def from_results(cls, onnx_path: str | Path, results_json: str | Path | None = None,
+                     condition: str = "shift_fitted", store=None,
                      **kwargs) -> ScoutPlanInference:
-        """Build with the temperature that was actually fitted, read from disk.
+        """Build with the temperature that was actually fitted.
 
         A deployed model reporting raw sigmoid confidence is precisely the
         miscalibrated system this project is about, so the fitted temperature is
         read from the calibration results rather than left to a default.
-        """
-        from scoutfield.utils.paths import results_dir
 
-        path = Path(results_json) if results_json else results_dir() / "calibration_sweep.json"
-        temperature = 1.0
-        if path.exists():
+        ``results_json`` is the offline override: a local copy of
+        ``calibration_sweep.json``. Without it the file is read from stage 02 of the
+        artefact store. ``condition`` picks the temperature: ``shift_fitted`` (field
+        imagery, the default for a deployed scout) or ``lab_fitted``. A missing file
+        or key raises; there is no uncalibrated fallback.
+        """
+        from scoutfield.envs.field_env import REFERENCE_CONDITIONS
+
+        if condition not in REFERENCE_CONDITIONS:
+            raise KeyError(f"unknown condition {condition!r}; have {sorted(REFERENCE_CONDITIONS)}")
+        if results_json is not None:
+            path = Path(results_json)
+            if not path.exists():
+                raise FileNotFoundError(f"no calibration results at {path}")
             with path.open("r", encoding="utf-8") as fh:
-                temperature = float(json.load(fh).get("fitted_temperature", 1.0))
+                data = json.load(fh)
         else:
-            print(f"warning: {path} not found; using T=1.0, which is uncalibrated")
-        return cls(onnx_path, temperature=temperature, **kwargs)
+            from scoutfield.utils.artifacts import get_store
+
+            data = (store or get_store()).pull_json("02_calibration",
+                                                    "calibration_sweep.json")
+        key = REFERENCE_CONDITIONS[condition]
+        if key not in data:
+            raise KeyError(f"calibration results have no {key!r}; re-run stage 02")
+        return cls(onnx_path, temperature=float(data[key]), **kwargs)
 
     def preprocess(self, image) -> np.ndarray:
         """Resize and normalise exactly as evaluation did during training.

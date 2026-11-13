@@ -103,6 +103,54 @@ def stratified_bootstrap_ci(
     return float(lo), float(hi)
 
 
+def stratified_bootstrap_ratio_ci(
+    a: np.ndarray,
+    a_strata: np.ndarray,
+    b: np.ndarray,
+    b_strata: np.ndarray,
+    statistic=iqm,
+    resamples: int = 10_000,
+    ci: float = 0.95,
+    rng: np.random.Generator | None = None,
+) -> tuple[float, float, str]:
+    """Confidence interval for ``statistic(a) / statistic(b)``.
+
+    Each resample draws ``a`` and ``b`` independently, each within its own strata,
+    and takes the ratio of the two statistics. This is the interval for a
+    degradation ratio such as "detections per joule fell 1.23x from T = 0.3 to
+    T = 1": both ends are estimates, so both are resampled.
+
+    Returns ``(low, high, stratified_by)``. When either sample has only singleton
+    strata, both are pooled and ``stratified_by`` says so (see
+    ``stratified_bootstrap_ci`` for why singleton strata cannot be resampled).
+    """
+    a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
+    a_strata, b_strata = np.asarray(a_strata), np.asarray(b_strata)
+    if a.shape[0] != a_strata.shape[0] or b.shape[0] != b_strata.shape[0]:
+        raise ValueError("values and strata differ in length")
+    rng = rng if rng is not None else np.random.default_rng(0)
+
+    def groups(strata):
+        return [np.flatnonzero(strata == s) for s in np.unique(strata)]
+
+    ga, gb = groups(a_strata), groups(b_strata)
+    stratified_by = "seed"
+    if all(g.size == 1 for g in ga) or all(g.size == 1 for g in gb):
+        ga, gb = [np.arange(a.size)], [np.arange(b.size)]
+        stratified_by = "pooled (no within-seed replicates)"
+
+    def draw(values, gs):
+        return values[np.concatenate([g[rng.integers(0, g.size, size=g.size)] for g in gs])]
+
+    ratios = np.empty(resamples, dtype=float)
+    for i in range(resamples):
+        denominator = statistic(draw(b, gb))
+        ratios[i] = statistic(draw(a, ga)) / denominator if denominator > 0 else np.inf
+    alpha = (1.0 - ci) / 2.0
+    lo, hi = np.quantile(ratios, [alpha, 1.0 - alpha])
+    return float(lo), float(hi), stratified_by
+
+
 def probability_of_improvement(a: np.ndarray, b: np.ndarray) -> float:
     """P(a > b) over paired runs, per Agarwal et al. (2021).
 

@@ -1,108 +1,37 @@
 """
-Path resolution, which differs between the session that *writes* an artefact and
-the session that *reads* it.
+Dataset path resolution.
 
-That asymmetry is the whole reason `find_checkpoint` exists: on Kaggle a run writes
-to /kaggle/working, which is per-session, while a later notebook receives the same
-file read-only under /kaggle/input. Code that assumes one location works in exactly
-one of the two places, which is how notebook 02 came to fail looking for notebook
-01's output.
+A dataset reaches a Kaggle notebook in one of two layouts, attached as an input
+(``/kaggle/input/<name>``) or downloaded with kagglehub
+(``<cache>/datasets/<owner>/<name>``), and ``data_dir`` has to find either.
+Files that cross from one stage to another do not use these paths at all; they go
+through the artefact store, tested in tests/test_artifacts.py.
 """
 
 from __future__ import annotations
 
-import pytest
-
 from scoutfield.utils import paths
 
 
-@pytest.fixture
-def working(tmp_path, monkeypatch):
-    """Redirect the writable directory, leaving the mount search to each test."""
-    root = tmp_path / "working"
-
-    def fake_output_dir(*parts: str):
-        out = root.joinpath(*parts)
-        out.mkdir(parents=True, exist_ok=True)
-        return out
-
-    monkeypatch.setattr(paths, "output_dir", fake_output_dir)
+def _rooted(monkeypatch, base):
     monkeypatch.setattr(paths, "is_kaggle", lambda: False)
-    return root
+    monkeypatch.setattr(paths, "repo_root", lambda: base)
 
 
-def test_finds_a_checkpoint_in_the_writable_directory(working):
-    target = working / "checkpoints" / "perception"
-    target.mkdir(parents=True)
-    (target / "best.pt").write_bytes(b"weights")
-
-    assert paths.find_checkpoint("perception", "best.pt") == target / "best.pt"
-
-
-def test_finds_a_checkpoint_mounted_from_an_earlier_notebook(working, tmp_path,
-                                                            monkeypatch):
-    """The producing session's /kaggle/working is what gets mounted, so the
-    checkpoints/ prefix survives into the mount."""
-    mount = tmp_path / "input" / "scoutfield-01-perception-finetune"
-    (mount / "checkpoints" / "perception").mkdir(parents=True)
-    (mount / "checkpoints" / "perception" / "best.pt").write_bytes(b"weights")
-
-    monkeypatch.setattr(paths, "is_kaggle", lambda: True)
-    monkeypatch.setattr(paths, "Path", _rooted_path(tmp_path / "input"))
-
-    found = paths.find_checkpoint("perception", "best.pt")
-    assert found.read_bytes() == b"weights"
+def test_data_dir_finds_an_attached_dataset(tmp_path, monkeypatch):
+    _rooted(monkeypatch, tmp_path)
+    (tmp_path / "data" / "plantdoc-dataset").mkdir(parents=True)
+    found = paths.data_dir("nirmalsankalana/plantdoc-dataset")
+    assert found == tmp_path / "data" / "plantdoc-dataset"
 
 
-def test_finds_a_checkpoint_nested_under_owner_and_slug(working, tmp_path, monkeypatch):
-    """kagglehub keeps the owner, so a fetched kernel output lands two levels below
-    the mount point rather than directly under it."""
-    nested = (tmp_path / "input" / "notebooks" / "odusinaoluwasegun"
-              / "scoutfield-01-perception-finetune" / "checkpoints" / "perception")
+def test_data_dir_finds_a_kagglehub_download(tmp_path, monkeypatch):
+    _rooted(monkeypatch, tmp_path)
+    nested = tmp_path / "data" / "datasets" / "nirmalsankalana" / "plantdoc-dataset"
     nested.mkdir(parents=True)
-    (nested / "best.pt").write_bytes(b"weights")
-
-    monkeypatch.setattr(paths, "is_kaggle", lambda: True)
-    monkeypatch.setattr(paths, "Path", _rooted_path(tmp_path / "input"))
-
-    assert paths.find_checkpoint("perception", "best.pt").read_bytes() == b"weights"
+    assert paths.data_dir("nirmalsankalana/plantdoc-dataset") == nested
 
 
-def test_the_writable_directory_wins_over_a_mount(working, tmp_path, monkeypatch):
-    """A checkpoint written by this session is the one this session meant."""
-    local = working / "checkpoints" / "perception"
-    local.mkdir(parents=True)
-    (local / "best.pt").write_bytes(b"this session")
-
-    mount = tmp_path / "input" / "scoutfield-01-perception-finetune"
-    (mount / "checkpoints" / "perception").mkdir(parents=True)
-    (mount / "checkpoints" / "perception" / "best.pt").write_bytes(b"earlier")
-
-    monkeypatch.setattr(paths, "is_kaggle", lambda: True)
-    monkeypatch.setattr(paths, "Path", _rooted_path(tmp_path / "input"))
-
-    assert paths.find_checkpoint("perception", "best.pt").read_bytes() == b"this session"
-
-
-def test_missing_checkpoint_names_every_location_searched(working):
-    """The failure has three usual causes and the message has to let the reader
-    tell them apart, so it lists what was actually looked at."""
-    with pytest.raises(FileNotFoundError) as excinfo:
-        paths.find_checkpoint("perception", "best.pt")
-
-    message = str(excinfo.value)
-    assert "Searched:" in message
-    assert str(working / "checkpoints" / "perception" / "best.pt") in message
-
-
-def _rooted_path(mount_root):
-    """A Path stand-in that redirects only the /kaggle/input lookup to tmp_path."""
-    from pathlib import Path as _Path
-
-    class RootedPath(_Path):
-        def __new__(cls, *args, **kwargs):
-            if args and str(args[0]) == "/kaggle/input":
-                return _Path(mount_root)
-            return _Path(*args, **kwargs)
-
-    return RootedPath
+def test_data_dir_names_the_canonical_location_when_absent(tmp_path, monkeypatch):
+    _rooted(monkeypatch, tmp_path)
+    assert paths.data_dir("owner/missing") == tmp_path / "data" / "missing"

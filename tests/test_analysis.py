@@ -128,14 +128,18 @@ def test_summary_reports_degradation_and_ranking(tmp_path):
     assert summary["n_rows"] == 20
     assert summary["agents"] == ["greedy_entropy", "lawnmower"]
 
+    # The fixture holds T = 1 and T = 4 only, so of the three spans only the
+    # underconfident one can be computed; the others are skipped, not invented.
     degradation = summary["degradation"]
+    assert set(degradation) == {"underconfident"}
+    span = degradation["underconfident"]["agents"]
     # Lawnmower was built to collapse ~10x and greedy to hold roughly flat. The
     # ratio is 9.78 rather than exactly 10 because the fixture adds a per-seed
     # offset, which is deliberate: without spread the IQM would be untested.
-    assert degradation["lawnmower"]["ratio"] == pytest.approx(9.78, rel=0.01)
-    assert degradation["greedy_entropy"]["ratio"] == pytest.approx(1.11, rel=0.05)
+    assert span["lawnmower"]["ratio"] == pytest.approx(9.78, rel=0.01)
+    assert span["greedy_entropy"]["ratio"] == pytest.approx(1.11, rel=0.05)
     # Every seed collapses, not just the average.
-    assert degradation["lawnmower"]["probability_of_improvement_T1_over_T4"] == 1.0
+    assert span["lawnmower"]["probability_of_improvement"] == 1.0
 
     # The ranking reverses at T=4, which is the pilot's finding restated.
     assert summary["rankings"]["T1"][0]["agent"] == "lawnmower"

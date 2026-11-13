@@ -11,6 +11,10 @@ training script.
     local         ./data/                          ./results, ./checkpoints
     Kaggle        /kaggle/input/<dataset-slug>/    /kaggle/working/
     CI            tests use fixtures, no data       tmp_path
+
+Files that cross from one stage to another never travel through these paths: they
+go through the artefact store (scoutfield.utils.artifacts), so no stage depends
+on where Kaggle mounted another stage's output.
 """
 
 from __future__ import annotations
@@ -77,89 +81,3 @@ def figures_dir() -> Path:
 
 def checkpoints_dir(*parts: str) -> Path:
     return output_dir("checkpoints", *parts)
-
-
-def find_checkpoint(*parts: str) -> Path:
-    """Locate an existing checkpoint, which an *earlier notebook* may have written.
-
-    Writing and reading a checkpoint are not symmetric on Kaggle, and conflating
-    them is why notebook 02 cannot find what notebook 01 produced. A run writes to
-    ``/kaggle/working/checkpoints`` — the only writable place — but that directory
-    belongs to one session and is gone when it ends. A later notebook receives the
-    same file mounted read-only under ``/kaggle/input``, attached either as that
-    notebook's committed output (``kernel_sources``) or as a published dataset.
-
-    So both are searched, writable location first, and the first hit wins. Locally
-    there is only one location and the extra search costs nothing.
-
-    Raises rather than returning a non-existent path: a missing checkpoint means the
-    upstream notebook was never committed or never attached, and that is worth
-    saying in as many words at the point of failure.
-    """
-    found, candidates = _search_checkpoint_locations(Path(*parts))
-    if found is None:
-        tail = Path(*parts)
-        shown = [str(c) for c in candidates[:12]]
-        if len(candidates) > len(shown):
-            shown.append(f"... and {len(candidates) - len(shown)} more")
-        raise FileNotFoundError(
-            f"checkpoint '{tail}' not found. Searched: " + ", ".join(shown)
-            + ". On Kaggle it is produced by an earlier notebook: commit that notebook "
-              "(Save Version -> Save & Run All) and attach it here as a kernel source, "
-              "or publish its output as a dataset and attach that."
-        )
-    return found
-
-
-def find_artifact(*parts: str) -> Path | None:
-    """The same search as ``find_checkpoint``, returning None instead of raising.
-
-    For artefacts whose absence is recoverable — a cached logit pool can be rebuilt
-    from the checkpoint, so not finding one is a cost, not an error.
-    """
-    return _search_checkpoint_locations(Path(*parts))[0]
-
-
-def _search_checkpoint_locations(tail: Path) -> tuple[Path | None, list[Path]]:
-    """Find ``tail`` under the writable directory or any mount; report where it looked.
-
-    Mount depth is not fixed. An attached kernel output sits directly under
-    ``/kaggle/input/<slug>``, while anything fetched with kagglehub keeps its owner
-    and lands at ``/kaggle/input/<kind>/<owner>/<slug>``. Walking a bounded number of
-    levels covers both without guessing which is in play; three is enough for the
-    deepest layout and stops well above the class directories, so the scan stays
-    cheap even beside a 50,000-image dataset.
-
-    The candidate list is returned alongside the hit so a caller that fails can say
-    exactly where it looked.
-    """
-    candidates = [output_dir("checkpoints") / tail]
-    if is_kaggle():
-        candidates.extend(
-            root / prefix / tail
-            for root in _shallow_dirs(Path("/kaggle/input"), max_depth=3)
-            for prefix in (Path("checkpoints"), Path("."))
-        )
-    return next((c for c in candidates if c.is_file()), None), candidates
-
-
-def _shallow_dirs(base: Path, max_depth: int) -> list[Path]:
-    """``base`` and its subdirectories, breadth-first, no deeper than ``max_depth``.
-
-    Depth-limited on purpose. A plain ``rglob`` under /kaggle/input would descend into
-    every attached dataset and stat tens of thousands of image files to find one
-    checkpoint.
-    """
-    if not base.exists():
-        return []
-    found, frontier = [base], [base]
-    for _ in range(max_depth):
-        nxt = []
-        for directory in frontier:
-            try:
-                nxt.extend(p for p in sorted(directory.iterdir()) if p.is_dir())
-            except OSError:
-                continue  # unreadable mount; not worth failing the search over
-        found.extend(nxt)
-        frontier = nxt
-    return found

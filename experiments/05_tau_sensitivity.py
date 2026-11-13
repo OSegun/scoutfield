@@ -43,6 +43,7 @@ write-up rather than leaving the asymmetry for a reader to notice.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -51,52 +52,40 @@ import numpy as np
 
 from scoutfield.analysis.stats import iqm, stratified_bootstrap_ci
 from scoutfield.config import load_config
+from scoutfield.utils.artifacts import get_store, load_settings
 from scoutfield.utils.checkpoint import DoneRegistry
 from scoutfield.utils.paths import results_dir
 from scoutfield.utils.seeding import run_id, seed_everything
 
-TAU_GRID = [0.55, 0.60, 0.65, 0.70, 0.75, 0.85, 0.90]
-
-# PPO evaluation is ~30x slower than the baselines, so it runs on a reduced tau
-# set. The asymmetry is deliberate and is stated here so the write-up reports it
-# rather than leaving a reader to notice the gap.
-PPO_TAU_GRID = [0.60, 0.75, 0.90]
+STAGE = "05_tau"
 
 
-def run_tau_sweep(cfg, agents=None, job_budget: int | None = None) -> Path:
-    """Sweep tau x temperature and write results/tau_sensitivity.csv.
-
-    Resumable on the same mechanism as the main sweep: this grid is several times
-    larger and will not finish inside one Kaggle session.
-    """
-    # Imported here rather than at module scope: `experiments/` is not a package,
-    # so the sibling driver is loaded by path.
-    import importlib.util
-
+def _sweep_driver():
+    """The sibling ``04_sweep.py``, loaded by path: ``experiments/`` is not a package."""
     spec = importlib.util.spec_from_file_location(
-        "sweep_driver", Path(__file__).with_name("04_sweep.py")
-    )
-    sweep = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(sweep)
+        "sweep_driver", Path(__file__).with_name("04_sweep.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
+
+def build_tau_jobs(cfg, agents=None) -> list[dict]:
+    """Every tau-sweep run, at the reference condition.
+
+    Baselines run every cluster scale, so each (agent, tau) cell holds several runs
+    per seed and the stratified bootstrap has something to resample. PPO runs the
+    single median scale on a reduced tau grid, because its evaluation is far slower;
+    its intervals are therefore pooled rather than stratified, and recorded as such.
+    """
+    tau_cfg = cfg.section("tau_sensitivity")
     agents = agents or list(cfg["agents"])
-    csv_path = results_dir() / "tau_sensitivity.csv"
-    registry = DoneRegistry(results_dir() / "_done_tau.json")
-
-    # Cluster scales. The baselines run all of them, so each (agent, tau) cell holds
-    # several runs per seed and the stratified bootstrap has something to resample —
-    # the first version pinned sigma to the median scale, which left one run per
-    # stratum and produced zero-width intervals. See scoutfield.analysis.stats.
-    #
-    # PPO keeps the single median scale: its evaluation is ~30x slower, and three
-    # scales across the reduced tau grid would not finish in a Kaggle session. Its
-    # intervals are therefore pooled rather than stratified, and recorded as such.
     all_sigmas = [float(s) for s in cfg["cluster_sigmas"]]
     median_sigma = all_sigmas[len(all_sigmas) // 2]
+    condition = str(cfg["reference_condition"])
 
     jobs = []
     for agent in agents:
-        grid = PPO_TAU_GRID if agent == "ppo" else TAU_GRID
+        grid = tau_cfg["ppo_tau_grid"] if agent == "ppo" else tau_cfg["tau_grid"]
         sigmas = [median_sigma] if agent == "ppo" else all_sigmas
         for tau in grid:
             for temperature in cfg["temperatures"]:
@@ -109,19 +98,47 @@ def run_tau_sweep(cfg, agents=None, job_budget: int | None = None) -> Path:
                             "temperature": float(temperature),
                             "tau": float(tau),
                             "sigma": sigma,
+                            "ppo_train_seed": None,
+                            "reference_condition": condition,
                         })
+    return jobs
 
+
+def run_tau_sweep(cfg, agents=None, job_budget: int | None = None, store=None) -> Path:
+    """Sweep tau x temperature and write results/tau_sensitivity.csv.
+
+    Resumable through the artefact store, stage ``05_tau``, exactly like the main
+    sweep: state is pulled on start and pushed every ``push_every_jobs`` jobs and
+    at the end. A row without an ECE aborts the sweep.
+    """
+    sweep = _sweep_driver()
+    store = store or get_store()
+    push_every = int(load_settings()["push_every_jobs"])
+    csv_path = results_dir() / "tau_sensitivity.csv"
+    registry_path = results_dir() / "_done_tau.json"
+    sweep.sync_resume_state(store, STAGE, registry_path, csv_path)
+    registry = DoneRegistry(registry_path)
+    store.record_inputs(STAGE, [("02_calibration", "calibration_sweep.json")])
+
+    jobs = build_tau_jobs(cfg, agents)
     pending = [j for j in jobs if j["run_id"] not in registry]
-    print(f"{len(jobs) - len(pending)}/{len(jobs)} tau jobs done; "
-          f"running {min(job_budget or len(pending), len(pending))}")
+    todo = pending[:job_budget or len(pending)]
+    print(f"{len(jobs) - len(pending)}/{len(jobs)} tau jobs done; running {len(todo)}")
 
-    for job in pending[:job_budget or len(pending)]:
-        row = sweep.run_job(job, cfg)
-        sweep._append_row(csv_path, row)
-        registry.mark(job["run_id"])
-        print(f"  tau={job['tau']:.2f} T={job['temperature']:.2f} "
-              f"{job['agent']:<14} det/J {row['detections_per_joule']:.4f}")
-
+    try:
+        for i, job in enumerate(todo, start=1):
+            row = sweep.run_job(job, cfg, store=store)
+            if row["ece"] is None:
+                raise RuntimeError(f"{job['run_id']}: no ECE for this condition; check "
+                                   f"stage 02 of run {store.run_id}")
+            sweep._append_row(csv_path, row)
+            registry.mark(job["run_id"])
+            print(f"  tau={job['tau']:.2f} T={job['temperature']:.2f} "
+                  f"{job['agent']:<14} det/J {row['detections_per_joule']:.4f}")
+            if i % push_every == 0:
+                sweep.push_state(store, STAGE, [csv_path, registry_path], f"{i} tau jobs")
+    finally:
+        sweep.push_state(store, STAGE, [csv_path, registry_path], "end of invocation")
     return csv_path
 
 
@@ -195,7 +212,15 @@ def main() -> None:
     cfg = load_config(args.config)
     seed_everything(cfg["seed"])
 
-    csv_path = run_tau_sweep(cfg, agents=args.agents, job_budget=args.job_budget)
+    store = get_store()
+    csv_path = run_tau_sweep(cfg, agents=args.agents, job_budget=args.job_budget,
+                             store=store)
+
+    registry = DoneRegistry(results_dir() / "_done_tau.json")
+    remaining = [j for j in build_tau_jobs(cfg, args.agents) if j["run_id"] not in registry]
+    if remaining:
+        print(f"{len(remaining)} tau jobs remain; run again to continue")
+        raise SystemExit(0)
 
     import csv as _csv
 
@@ -206,10 +231,11 @@ def main() -> None:
     out = results_dir() / "tau_sensitivity_summary.json"
     with out.open("w", encoding="utf-8") as fh:
         json.dump(summary, fh, indent=2)
+    store.push(STAGE, [csv_path, results_dir() / "_done_tau.json", out], "tau sweep complete")
 
     for key, entry in sorted(summary.items()):
         print(f"{key:<28} ratio T1/T4 = {entry['ratio']:.2f}  (n={entry['n']})")
-    print(f"wrote {out}")
+    print(f"wrote and pushed {out}")
 
 
 if __name__ == "__main__":

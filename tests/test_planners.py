@@ -89,20 +89,16 @@ def test_regret_is_zero_when_matching_the_oracle():
         regret(0.5, 0.0)
 
 
-def test_ppo_trains_checkpoints_and_resumes(tmp_path, monkeypatch):
-    """The training path runs, saves, and resumes from what it saved.
+def test_ppo_trains_checkpoints_and_resumes(tmp_path, monkeypatch, store):
+    """The training path runs, pushes its state to the store, and resumes from it.
 
-    Kaggle kills sessions, so a training loop that cannot resume is a bug. This
-    is the cheapest possible version of that check — a few hundred steps, not
-    convergence.
+    Kaggle kills sessions, so a training loop that cannot resume is a bug. This is
+    the cheapest version of that check: a few hundred steps, not convergence.
     """
     from scoutfield.config import load_config
     from scoutfield.planners.ppo import PPOPlanner, train_ppo
 
-    # `train_ppo` imports these at call time, so patching the source module is
-    # enough. Redirecting them keeps a test from overwriting a real run's
-    # checkpoint — resuming a real sweep from a 256-step smoke model would be
-    # both silent and badly wrong.
+    # Redirected so a test cannot overwrite a real run's local checkpoint.
     monkeypatch.setattr("scoutfield.utils.paths.checkpoints_dir",
                         lambda *p: _mk(tmp_path, "checkpoints", *p))
     monkeypatch.setattr("scoutfield.utils.paths.results_dir",
@@ -110,19 +106,28 @@ def test_ppo_trains_checkpoints_and_resumes(tmp_path, monkeypatch):
 
     cfg = load_config("configs/ppo_field32.yaml")
     cfg.data["ppo"].update({"n_envs": 1, "n_steps": 128, "batch_size": 64,
-                            "checkpoint_freq": 10_000})
+                            "checkpoint_freq": 128})
     clf = _synthetic_classifier()
 
-    first = train_ppo(cfg, seed=0, classifier=clf, total_timesteps=256)
+    first = train_ppo(cfg, seed=0, classifier=clf, total_timesteps=256, store=store)
     assert first.exists()
+    for name in ("ppo_seed0.zip", "ppo_seed0_resume.zip", "ppo_curve_seed0.json"):
+        assert store.has("03_ppo", name), f"{name} was not pushed"
+    curve = store.pull_json("03_ppo", "ppo_curve_seed0.json")
+    assert curve["complete"] is True and curve["total_timesteps"] == 256
+    assert curve["effective_divisor"] == curve["reference_temperature"]
 
-    resume_marker = first.parent / "ppo_seed0_resume.zip"
-    assert resume_marker.exists(), "no resume checkpoint written"
+    # A finished seed is skipped, not retrained.
+    again = train_ppo(cfg, seed=0, classifier=clf, total_timesteps=256, store=store)
+    assert again.read_bytes() == store.pull("03_ppo", "ppo_seed0.zip").read_bytes()
 
-    second = train_ppo(cfg, seed=0, classifier=clf, total_timesteps=128)
-    assert second.exists()
+    # A longer run of the same seed resumes from the stored state.
+    longer = train_ppo(cfg, seed=0, classifier=clf, total_timesteps=384, store=store)
+    curve = store.pull_json("03_ppo", "ppo_curve_seed0.json")
+    assert curve["resumed_from_timestep"] == 256
+    assert curve["total_timesteps"] == 384
 
-    planner = PPOPlanner(second)
+    planner = PPOPlanner(longer)
     info = _run(planner, make_field_env(seed=1, budget=120.0))
     assert 0.0 <= info["coverage"] <= 1.0
 

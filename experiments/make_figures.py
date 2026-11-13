@@ -1,11 +1,15 @@
 ﻿"""
-Regenerate every figure from results/summary.json.
+Regenerate every figure from the run's results in the artefact store.
 
     python experiments/make_figures.py
 
+Inputs are pulled from stages 02 to 05 of the run named in ``configs/artifacts.yaml``;
+Figures 9 to 15 are pushed to stage ``06_figures``. Figure 16 needs the optional
+uncertainty-method comparison and is drawn only when that exists.
+
 Rules inherited from the pilot, and why each exists
 ----------------------------------------------------
-* Every number is read from ``results/summary.json``. Nothing is hard-coded. Never
+* Every number is read from a generated results file. Nothing is hard-coded. Never
   regenerate a document before regenerating the figures, or text and data disagree and
   nobody notices.
 * Figures are named ``Figure{N}_{Title_Case}.png`` and referenced *by number* in the
@@ -24,12 +28,11 @@ No accent stripes, no colour bars. Cards use a background tint and a soft shadow
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 import numpy as np
 
-from scoutfield.utils.paths import figures_dir, results_dir
+from scoutfield.utils.paths import figures_dir
 
 PALETTE = {
     "forest": "#2C5F2D", "dark": "#1B3A1C", "panel": "#24491F",
@@ -106,62 +109,81 @@ def _save(fig, number: int) -> Path:
 def _cells(summary, agent):
     """(temperature, cell) pairs for one agent, ordered by temperature."""
     out = [(c["temperature"], c) for c in summary["cells"].values() if c["agent"] == agent]
-    return sorted(out)
+    return sorted(out, key=lambda pair: pair[0])
 
 
-def figure_13_detections_per_joule(summary, plt) -> Path:
-    """The pilot's headline metric, re-measured on a real classifier."""
-    fig, ax = plt.subplots(figsize=(6, 4))
-    colours = [PALETTE["forest"], PALETTE["moss"], PALETTE["leaf"],
-               PALETTE["panel"], PALETTE["muted"]]
-
-    for colour, agent in zip(colours, summary["agents"]):
-        pairs = _cells(summary, agent)
-        if not pairs:
-            continue
-        temps = [t for t, _ in pairs]
-        vals = [c["detections_per_joule"]["value"] for _, c in pairs]
-        lo = [c["detections_per_joule"]["ci_low"] for _, c in pairs]
-        hi = [c["detections_per_joule"]["ci_high"] for _, c in pairs]
-        ax.plot(temps, vals, marker="o", markersize=4, color=colour, label=agent)
-        if not any(np.isnan(lo)):
-            ax.fill_between(temps, lo, hi, color=colour, alpha=0.15, linewidth=0)
-
-    ax.set_xlabel("temperature (relative to the fitted calibrated point)")
-    ax.set_ylabel("detections per joule")
-    ax.set_title("Detections per joule by temperature")
-    ax.legend(frameon=False, fontsize=8)
-    return _save(fig, 13)
+COLOURS = [PALETTE["forest"], PALETTE["moss"], PALETTE["leaf"],
+           PALETTE["panel"], PALETTE["muted"]]
 
 
-def figure_10_temperature_sweep(plt) -> Path | None:
+def _temperature_axis(ax, temperatures) -> None:
+    """Log-scaled temperature axis, labelled with the grid's own values.
+
+    Log scale because the grid is multiplicative around T = 1 (0.3 and 3 are
+    equally far from calibrated). Plain labels because the default log labels
+    need superscript glyphs the body font may not have.
+    """
+    from matplotlib.ticker import FixedLocator, NullLocator
+
+    ticks = sorted({float(t) for t in temperatures})
+    ax.set_xscale("log")
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_minor_locator(NullLocator())
+    ax.set_xticklabels([f"{t:g}" for t in ticks])
+
+
+def figure_9_reliability_under_shift(calibration, plt) -> Path:
+    """Reliability on shift_eval, lab-fitted and shift-fitted side by side.
+
+    The lab-fitted panel is a system calibrated on PlantVillage and flown over a
+    field; the shift-fitted panel is the calibration point the planner sweep is
+    centred on. Bars further from the diagonal are worse calibrated.
+    """
+    panels = [("shift_eval_lab", "Lab-fitted temperature"),
+              ("shift_eval", "Shift-fitted temperature")]
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4), sharey=True)
+    for ax, (name, title) in zip(axes, panels):
+        sweep = calibration["sweeps"][name]
+        rel = sweep["reliability_at_fitted"]
+        width = 1.0 / rel["bins"]
+        ax.bar(rel["bin_centre"], rel["accuracy"], width=width * 0.9,
+               color=PALETTE["moss"], edgecolor=PALETTE["forest"], label="accuracy")
+        ax.plot([0.5, 1.0], [0.5, 1.0], linestyle="--", color=PALETTE["muted"],
+                linewidth=1, label="perfect calibration")
+        ece = sweep["at_fitted_temperature"]["ece"]
+        ax.set_title(f"{title}\n(T* = {sweep['fitted_temperature']:.3f}, ECE {ece:.4f})")
+        ax.set_xlabel("confidence")
+        ax.set_xlim(0.5, 1.0)
+    axes[0].set_ylabel("accuracy")
+    axes[0].legend(frameon=False, fontsize=8)
+    fig.suptitle("Calibration under shift, PlantDoc shift_eval", fontsize=11)
+    fig.tight_layout()
+    return _save(fig, 9)
+
+
+def figure_10_temperature_sweep(calibration, plt) -> Path:
     """Accuracy invariance and the ECE curve, from the calibration run."""
-    path = _find_result("calibration_sweep.json")
-    if not path.exists():
-        print("  skipping Figure 10: results/calibration_sweep.json not found")
-        return None
-    with path.open("r", encoding="utf-8") as fh:
-        data = json.load(fh)
-
     fig, (ax_acc, ax_ece) = plt.subplots(1, 2, figsize=(9, 3.6))
-    for split, colour in (("test", PALETTE["forest"]), ("shift", PALETTE["moss"])):
-        sweep = data.get("splits", {}).get(split, {}).get("sweep")
-        if not sweep:
-            continue
+    series = [("test", "PlantVillage test (lab-fitted)"),
+              ("shift_eval_lab", "PlantDoc shift_eval (lab-fitted)"),
+              ("shift_eval", "PlantDoc shift_eval (shift-fitted)")]
+    for colour, (name, label) in zip(COLOURS, series):
+        sweep = calibration["sweeps"][name]["sweep"]
         temps = sorted(float(t) for t in sweep)
         ax_acc.plot(temps, [sweep[f"{t:g}"]["accuracy"] for t in temps],
-                    marker="o", markersize=4, color=colour, label=split)
+                    marker="o", markersize=4, color=colour, label=label)
         ax_ece.plot(temps, [sweep[f"{t:g}"]["ece"] for t in temps],
-                    marker="o", markersize=4, color=colour, label=split)
+                    marker="o", markersize=4, color=colour, label=label)
 
     ax_acc.set_title("Accuracy is invariant to temperature")
-    ax_acc.set_xlabel("temperature")
     ax_acc.set_ylabel("accuracy")
-    ax_ece.set_title("ECE is minimised at the calibrated point")
-    ax_ece.set_xlabel("temperature")
+    ax_ece.set_title("ECE against temperature")
     ax_ece.set_ylabel("ECE")
+    grid = [float(t) for t in calibration["sweeps"]["shift_eval"]["sweep"]]
     for ax in (ax_acc, ax_ece):
-        ax.legend(frameon=False, fontsize=8)
+        _temperature_axis(ax, grid)
+        ax.set_xlabel("T, relative to the fitted temperature")
+        ax.legend(frameon=False, fontsize=7)
     fig.tight_layout()
     return _save(fig, 10)
 
@@ -190,42 +212,10 @@ def figure_11_coverage_ceiling(plt) -> Path:
     return _save(fig, 11)
 
 
-def _find_result(name: str):
-    """A results file from this session, or from an earlier notebook's mount.
-
-    Figures 10 and 12 are drawn from artefacts notebooks 02 and 03 produced. In a
-    fresh session those are not in ``results/`` — they arrive read-only under
-    ``/kaggle/input``. Looking only locally silently skips the figure and leaves a
-    figure set that is quietly missing two panels.
-    """
-
-    from scoutfield.utils.paths import find_artifact
-
-    local = results_dir() / name
-    return local if local.exists() else find_artifact("results", name)
-
-
-def _find_results_glob(pattern: str, limit: int = 10) -> list:
-    """``_find_result`` over a numbered family, e.g. ``ppo_curve_seed{}.json``.
-
-    A glob cannot cross mount points that are discovered rather than known, so the
-    index is enumerated instead. Ten covers any seed count this study will use.
-    """
-    found = [_find_result(pattern.format(i)) for i in range(limit)]
-    return [p for p in found if p is not None]
-
-
-def figure_12_ppo_curves(plt) -> Path | None:
-    """Learning curves over every seed that has been trained."""
-    curves = _find_results_glob("ppo_curve_seed{}.json")
-    if not curves:
-        print("  skipping Figure 12: no results/ppo_curve_seed*.json found")
-        return None
-
+def figure_12_ppo_curves(curves: list[dict], plt) -> Path:
+    """Learning curves of the final policies, one per training seed."""
     fig, ax = plt.subplots(figsize=(6, 3.6))
-    for path in curves:
-        with path.open("r", encoding="utf-8") as fh:
-            data = json.load(fh)
+    for colour, data in zip(COLOURS, curves):
         episodes = data.get("episodes", [])
         if not episodes:
             continue
@@ -235,7 +225,7 @@ def figure_12_ppo_curves(plt) -> Path | None:
         # events and the raw trace hides whether the curve has flattened.
         window = max(len(vals) // 20, 1)
         smoothed = np.convolve(vals, np.ones(window) / window, mode="valid")
-        ax.plot(steps[:len(smoothed)], smoothed, linewidth=1.2,
+        ax.plot(steps[:len(smoothed)], smoothed, linewidth=1.2, color=colour,
                 label=f"seed {data['seed']}")
 
     ax.set_xlabel("timestep")
@@ -245,22 +235,53 @@ def figure_12_ppo_curves(plt) -> Path | None:
     return _save(fig, 12)
 
 
-def figure_14_tau_surface(plt) -> Path | None:
-    """Effect size as a function of tau — the analysis that unblocks the headline."""
-    path = results_dir() / "tau_sensitivity_summary.json"
-    if not path.exists():
-        print("  skipping Figure 14: results/tau_sensitivity_summary.json not found")
-        return None
-    with path.open("r", encoding="utf-8") as fh:
-        data = json.load(fh)
+def figure_13_detections_per_joule(summary, plt) -> Path:
+    """The pilot's headline metric, re-measured on a real classifier.
 
+    T = 1 is the calibrated point under shift. Left of it the classifier is
+    overconfident, right of it underconfident; the two halves are shaded because
+    the pilot's effect lived almost entirely in the right-hand one.
+    """
+    fig, ax = plt.subplots(figsize=(6.4, 4))
+    temps_all = summary["temperatures"]
+    lo_t, hi_t = min(temps_all), max(temps_all)
+    ax.axvspan(lo_t, 1.0, color=PALETTE["warm"], alpha=0.9, linewidth=0)
+    ax.axvspan(1.0, hi_t, color=PALETTE["tint"], alpha=0.9, linewidth=0)
+    ax.axvline(1.0, color=PALETTE["muted"], linestyle="--", linewidth=1)
+
+    for colour, agent in zip(COLOURS, summary["agents"]):
+        pairs = _cells(summary, agent)
+        if not pairs:
+            continue
+        temps = [t for t, _ in pairs]
+        vals = [c["detections_per_joule"]["value"] for _, c in pairs]
+        lo = [c["detections_per_joule"]["ci_low"] for _, c in pairs]
+        hi = [c["detections_per_joule"]["ci_high"] for _, c in pairs]
+        ax.plot(temps, vals, marker="o", markersize=4, color=colour, label=agent)
+        if not any(np.isnan(lo)):
+            ax.fill_between(temps, lo, hi, color=colour, alpha=0.15, linewidth=0)
+
+    _temperature_axis(ax, temps_all)
+    ymax = ax.get_ylim()[1]
+    ax.text(np.sqrt(lo_t * 1.0), ymax * 0.97, "overconfident", ha="center", va="top",
+            fontsize=8, color=PALETTE["muted"])
+    ax.text(np.sqrt(1.0 * hi_t), ymax * 0.97, "underconfident", ha="center", va="top",
+            fontsize=8, color=PALETTE["muted"])
+    ax.set_xlabel("T, relative to the shift-fitted temperature (T = 1 calibrated)")
+    ax.set_ylabel("detections per joule")
+    ax.set_title("Detections per joule by temperature")
+    ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1.0))
+    return _save(fig, 13)
+
+
+def figure_14_tau_surface(tau_summary, plt) -> Path:
+    """Effect size as a function of tau — the analysis that unblocks the headline."""
     by_agent: dict[str, list[tuple[float, float]]] = {}
-    for entry in data.values():
+    for entry in tau_summary.values():
         by_agent.setdefault(entry["agent"], []).append((entry["tau"], entry["ratio"]))
 
     fig, ax = plt.subplots(figsize=(6, 3.8))
-    colours = [PALETTE["forest"], PALETTE["moss"], PALETTE["leaf"], PALETTE["panel"]]
-    for colour, (agent, points) in zip(colours, sorted(by_agent.items())):
+    for colour, (agent, points) in zip(COLOURS, sorted(by_agent.items())):
         points.sort()
         ax.plot([t for t, _ in points], [r for _, r in points],
                 marker="o", markersize=4, color=colour, label=agent)
@@ -275,38 +296,87 @@ def figure_14_tau_surface(plt) -> Path | None:
     return _save(fig, 14)
 
 
-def make_all(only: list[int] | None = None) -> list[Path]:
-    """Regenerate figures from the generated results, never from hand-entered numbers."""
+def figure_15_regret(summary, plt) -> Path:
+    """Regret against the oracle on detections per joule, per planner and T.
+
+    The oracle is greedy nearest-diseased-cell, a lower bound on the true
+    ceiling, so these regrets understate the real gap.
+    """
+    from scoutfield.planners.oracle import regret
+
+    oracle = dict(_cells(summary, "oracle"))
+    if not oracle:
+        raise SystemExit("summary.json has no oracle cells; Figure 15 needs them")
+    fig, ax = plt.subplots(figsize=(6, 3.8))
+    planners = [a for a in summary["agents"] if a != "oracle"]
+    for colour, agent in zip(COLOURS, planners):
+        pairs = [(t, c) for t, c in _cells(summary, agent) if t in oracle]
+        temps = [t for t, _ in pairs]
+        vals = [regret(c["detections_per_joule"]["value"],
+                       oracle[t]["detections_per_joule"]["value"]) for t, c in pairs]
+        ax.plot(temps, vals, marker="o", markersize=4, color=colour, label=agent)
+    ax.axvline(1.0, color=PALETTE["muted"], linestyle="--", linewidth=1)
+    _temperature_axis(ax, summary["temperatures"])
+    ax.set_ylim(0, 1)
+    ax.set_xlabel("T, relative to the shift-fitted temperature")
+    ax.set_ylabel("regret on detections per joule")
+    ax.set_title("Regret against the greedy oracle (a lower bound)")
+    ax.legend(frameon=False, fontsize=8, loc="upper left", bbox_to_anchor=(1.01, 1.0))
+    return _save(fig, 15)
+
+
+def check_same_commit(store, stage: str, names: list[str]) -> None:
+    """Refuse to draw from files of one stage that were not pushed together.
+
+    The summary and the CSV it was built from are pushed in one commit when a
+    sweep completes. If their manifest entries record different commits, one was
+    replaced without the other, and a figure from the pair would mix two states.
+    """
+    files = store.stage_entry(stage).get("files", {})
+    commits = {files[n]["hub_commit"] for n in names if n in files}
+    if len(commits) > 1:
+        raise SystemExit(f"{', '.join(names)} in stage {stage} come from different "
+                         "store commits; re-run that stage to completion first.")
+
+
+def make_all(only: list[int] | None = None, store=None) -> list[Path]:
+    """Pull the run's results, draw every figure, push them to ``06_figures``."""
+    from scoutfield.config import load_config
+    from scoutfield.utils.artifacts import get_store
+
+    store = store or get_store()
     plt = _style()
-    summary_path = results_dir() / "summary.json"
     wanted = set(only) if only else set(FIGURES)
     written: list[Path] = []
 
-    # Figures that do not depend on the sweep summary can be built without it.
+    calibration = store.pull_json("02_calibration", "calibration_sweep.json")
+    if 9 in wanted:
+        written.append(figure_9_reliability_under_shift(calibration, plt))
+    if 10 in wanted:
+        written.append(figure_10_temperature_sweep(calibration, plt))
     if 11 in wanted:
         written.append(figure_11_coverage_ceiling(plt))
-    if 10 in wanted:
-        written.append(figure_10_temperature_sweep(plt))
     if 12 in wanted:
-        written.append(figure_12_ppo_curves(plt))
+        seeds = load_config("configs/sweep.yaml")["ppo_train_seeds"]
+        curves = [store.pull_json("03_ppo", f"ppo_curve_seed{s}.json") for s in seeds]
+        written.append(figure_12_ppo_curves(curves, plt))
+    if wanted & {13, 15}:
+        check_same_commit(store, "04_sweep", ["summary.json", "sweep_results.csv"])
+        summary = store.pull_json("04_sweep", "summary.json")
+        if 13 in wanted:
+            written.append(figure_13_detections_per_joule(summary, plt))
+        if 15 in wanted:
+            written.append(figure_15_regret(summary, plt))
     if 14 in wanted:
-        written.append(figure_14_tau_surface(plt))
+        written.append(figure_14_tau_surface(
+            store.pull_json("05_tau", "tau_sensitivity_summary.json"), plt))
+    if 16 in wanted:
+        print("  Figure 16 needs the uncertainty-method comparison (stage 07); not drawn")
 
-    if wanted & {13}:
-        check_not_stale(summary_path, [
-            results_dir() / "sweep_results.csv",
-            results_dir() / "calibration_sweep.json",
-        ])
-        with summary_path.open("r", encoding="utf-8") as fh:
-            summary = json.load(fh)
-        written.append(figure_13_detections_per_joule(summary, plt))
-
-    unimplemented = wanted & {9, 15, 16}
-    if unimplemented:
-        print(f"  figures {sorted(unimplemented)} need data that does not exist yet "
-              "(uncertainty-method comparison and regret); not drawn")
-
-    return [w for w in written if w is not None]
+    if written:
+        store.push("06_figures", written, f"figures {sorted(wanted - {16})}")
+        store.record_inputs("06_figures")
+    return written
 
 
 def main() -> None:
@@ -315,7 +385,7 @@ def main() -> None:
                         help=f"figure numbers to rebuild; default all of {sorted(FIGURES)}")
     args = parser.parse_args()
     written = make_all(args.only)
-    print(f"{len(written)} figure(s) written to {figures_dir()}")
+    print(f"{len(written)} figure(s) written to {figures_dir()} and pushed")
 
 
 if __name__ == "__main__":
