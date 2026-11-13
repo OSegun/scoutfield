@@ -126,28 +126,28 @@ ways, not two:
 | `val` | `val_fraction` = 0.15 | fits the temperature, and nothing else |
 | `test` | `test_fraction` = 0.15 | early stopping, model selection, and the reported in-distribution accuracy |
 
-#### BASE_ACC — settled 19 August 2026
+#### BASE_ACC
 
-**BASE_ACC = 0.8036, the PlantDoc shift accuracy.** Not the 0.9998 measured on the
-PlantVillage `test` split, which an earlier draft of the row above assigned to the role.
-Three reasons, in order of weight:
+**BASE_ACC is the PlantDoc shift accuracy**, read from `results/perception_summary.json`
+(`accuracy_shift`), not the accuracy on the PlantVillage `test` split. Three reasons, in
+order of weight:
 
 1. **It is the accuracy the sweep actually runs at.** `configs/sweep.yaml` sets
-   `pool_split: shift`, so every planner number in `docs/RESULTS.md` was produced against a
-   classifier operating at 0.8036. A BASE_ACC drawn from a split the experiment does not
-   use would describe nothing that was measured.
-2. **The in-distribution condition is degenerate for this study's question.** At 0.9998
-   accuracy and ECE 0.0004, a false positive essentially cannot occur at τ = 0.75 —
-   measured PPO precision is exactly 1.000 and false alarms exactly 0, on every episode of
-   every seed. The precision-for-recall trade this study exists to measure is unmeasurable
-   there. Its swept ECE range, 0.0002–0.0258, is also an order of magnitude below the
-   pilot's 0.0037–0.1980.
+   `pool_split: shift`, so every planner number in `docs/RESULTS.md` is produced against a
+   classifier operating at the shift accuracy. A BASE_ACC drawn from a split the
+   experiment does not use would describe nothing that was measured.
+2. **The in-distribution condition is degenerate for this study's question.** PlantVillage
+   is controlled laboratory imagery and a fine-tuned network sits near the accuracy
+   ceiling on it, with near-zero calibration error. A false positive then essentially
+   cannot occur at τ = 0.75, so the precision-for-recall trade this study exists to
+   measure has no room to appear.
 3. **It keeps the two phases comparable.** The pilot pinned BASE_ACC at 0.816 from Ahmad et
-   al. (2023). 0.8036 sits beside it, so a difference between the phases is attributable to
-   the classifier rather than to a change of operating point.
+   al. (2023), the accuracy of a classifier in deployment rather than in the lab. The shift
+   accuracy is the matching operating point here, so a difference between the phases is
+   attributable to the classifier rather than to a change of operating point.
 
 The `test` split is therefore the **control** condition: it establishes that the
-temperature instrument works on a real network — accuracy invariant to six decimal places —
+temperature instrument works on a real network — accuracy invariant across the sweep —
 and that the model is well calibrated where it was trained. It is not the experimental
 condition, and its accuracy is not BASE_ACC.
 
@@ -175,17 +175,18 @@ that cache. Temperature acts only on logits, so caching is exact rather than app
 no fidelity is lost relative to running the network each time.
 
 Which split the cache comes from **is the experimental condition**, and the two are not
-interchangeable: `test` is in-distribution PlantVillage (8,146 logits, accuracy 0.9998),
-`shift` is PlantDoc field imagery (2,922 logits, accuracy 0.8036). Pools are stored under
-split-keyed filenames so one cannot silently stand in for the other, the condition is
-written into every row of `results/sweep_results.csv`, and training and evaluation must
-use the same one — see `docs/RESULTS.md`, section *"3. Planners"*, for what happened when
-they did not.
+interchangeable: `test` is in-distribution PlantVillage, `shift` is PlantDoc field
+imagery. Pools are stored under split-keyed filenames so one cannot silently stand in for
+the other, the condition is written into every row of `results/sweep_results.csv`, and
+training and evaluation must use the same one: a policy trained on one split and scored
+on another would be the only planner evaluated away from where it was fitted.
 
-**Limitation: the pool is finite, and small on the shift split.** It holds 823 healthy and
-2,099 diseased logits, while a single episode at ~0.35 coverage makes roughly 358
-observations. Draws are with replacement, so an episode reuses a meaningful fraction of
-the healthy pool and two episodes are not fully independent in the logits they see.
+**Limitation: the pool is finite, and small on the shift split.** PlantDoc holds a few
+thousand images, with healthy leaves the minority class, while a single episode can
+observe up to about 400 cells (the coverage ceiling, 0.391 × 1024, section
+*"3. Environment"*). Draws are with
+replacement, so an episode reuses a meaningful fraction of the healthy pool and two
+episodes are not fully independent in the logits they see.
 
 This is a bootstrap from the empirical logit distribution rather than draws from a
 generative model, and it is a departure from the pilot, whose Gaussian surrogate could
@@ -217,22 +218,23 @@ should not be trusted. Report the pool sizes alongside any such result.
 
 **Prevalence is held constant across the scale change, and this is not cosmetic.** The
 Neyman–Scott parameters generate an absolute *count* of diseased cells, not a density.
-Inheriting the pilot's `n_parents = 3` at 32×32 drops prevalence from 0.170 to 0.030 — a
-5.7× change arriving silently alongside the grid change, so that two things move at once
-and neither result is attributable. Measured over 30 seeds, `n_parents = 18` reproduces
-the pilot's prevalence (0.1700 against 0.1697).
+Inheriting the pilot's `n_parents = 3` at 32×32 would drop prevalence to a small fraction
+of the pilot's, a change arriving silently alongside the grid change, so that two things
+move at once and neither result is attributable. `n_parents = 18` holds the pilot's
+prevalence (0.1697); `tests/test_env_parity.py`
+(`test_scaled_field_holds_the_pilot_prevalence`) measures it over 30 seeds on every test
+run.
 
 Note 18, not the 21 that naive area scaling (1024 / 144 = 7.1×) suggests: clusters overlap
 more at higher density, so the value is measured rather than derived.
 
-This mattered. At the uncorrected prevalence the planner ranking inverts — GreedyEntropy
-beat Lawnmower on detections/joule (0.0084 against 0.0069), while at held prevalence
-Lawnmower wins (0.0564 against 0.0325). A prevalence confound would have been reported as
-a calibration effect.
+This matters because prevalence moves planner performance on its own: a prevalence
+change can reorder the planners, and would then be reported as a calibration effect.
 
 **Coverage ceiling, verified empirically rather than assumed:** the analytic bound for
-32×32 at budget 640 is 0.3906, and a Lawnmower sweep measures 0.391 over 5 seeds. The
-intended ≤40% regime holds.
+32×32 at budget 640 is 0.3906. Measured Lawnmower coverage is read from
+`results/summary.json` and must sit at or just below that bound for the intended ≤40%
+regime to hold.
 
 **Belief update.** Bayesian, via likelihood ratio. This is what makes miscalibration a
 *systematic bias in belief dynamics* rather than additive noise — and that mechanism is

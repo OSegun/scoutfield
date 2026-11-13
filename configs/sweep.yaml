@@ -26,11 +26,11 @@ seeds: [0, 1, 2, 3, 4]
 ppo_train_seeds: [0, 1, 2]
 
 # The experimental condition. `shift` = PlantDoc field imagery, where the
-# classifier is overconfident (ECE 0.1376) and the precision-for-recall trade this
-# study measures can actually occur. It must match `CALIBRATION_SPLIT` in
+# classifier is overconfident and the precision-for-recall trade this study
+# measures can actually occur. It must match `CALIBRATION_SPLIT` in
 # experiments/04_sweep.py, which pairs each row with the measured ECE for the same
-# split. See docs/RESULTS.md, section "1. Perception", for why the in-distribution
-# split is degenerate here.
+# split. See docs/METHOD.md, section "2. Perception" -> "BASE_ACC", for why the
+# in-distribution split is the control rather than the experiment.
 pool_split: shift
 cluster_sigmas: [0.75, 1.50, 3.00]
 

@@ -47,11 +47,11 @@ INFO_KEYS = ("recall", "precision", "detections_per_joule",
 # The experimental condition, in one place so the reported ECE and the observed
 # logits cannot come from different splits.
 #
-# `shift` — PlantDoc field imagery: accuracy 0.8036, ECE 0.1376, overconfident in
-# every reliability bin. `test` is in-distribution and, at 0.9998 accuracy with ECE
-# 0.0004, leaves a planner nothing to consume: precision sits at exactly 1.000 with
-# zero false alarms, so the precision-for-recall trade this study measures cannot
-# occur. See docs/RESULTS.md, section "3. Planners" -> "PPO training".
+# `shift` — PlantDoc field imagery, where the lab-to-field gap makes the classifier
+# overconfident. `test` is in-distribution and near the accuracy ceiling, which leaves
+# a planner almost no uncertainty to consume and almost no room for the
+# precision-for-recall trade this study measures. See docs/METHOD.md, section
+# "2. Perception" -> "BASE_ACC".
 CALIBRATION_SPLIT = "shift"
 
 

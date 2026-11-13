@@ -1,15 +1,7 @@
 # Results
 
-**Perception, calibration, the planner sweep and the τ analysis are measured.** What
-remains unmeasured is section *"5. Uncertainty methods"* — MC-dropout and deep ensembles
-— and the reliability diagrams. Every remaining placeholder reads `—` and has the shape
-the result will take.
-
-Also measured, and shown in bold where they appear: the coverage ceiling and field
-prevalence in section *"2. Environment"*, and the export equivalence and inference
-latency in section *"6. Deployment"*. Neither depends on trained weights — they are
-properties of the environment configuration and of the exported graph — which is why they
-predate the perception model.
+**Results: in production.** Every value below reads `—` until the run that produces it
+is complete. Each table already has the shape its result will take.
 
 This file is written *from* `results/summary.json`, not from memory. If a number here
 disagrees with that file, this file is wrong.
@@ -21,108 +13,49 @@ disagrees with that file, this file is wrong.
 Roadmap items 1 and 3. Source: `results/perception_summary.json`,
 `results/calibration_sweep.json`.
 
-Measured 10 August 2026 from commit `34e1023`, seed 0, EfficientNet-B0, 12 epochs, best
-epoch 6. Splits: 38,013 train / 8,146 val / 8,146 test (38 fine-grained classes, ~72%
-diseased); shift 2,922 across 28 classes.
-
 | Metric | PlantVillage (test) | PlantDoc (shift) |
 | --- | --- | --- |
-| Accuracy | **0.9998** | **0.8036** |
-| ECE at fitted `T` | **0.0004** | **0.1376** |
-| Signed calibration error | **−0.0003** | **+0.1376** |
+| Accuracy | — | — |
+| ECE at fitted `T` | — | — |
+| Signed calibration error | — | — |
 | NLL | — | — |
 | Brier | — | — |
 
-Fitted temperature: **0.7723** (fitted on validation, applied to both columns)
+Fitted temperature: —
 
-Three things in that table matter more than the headline accuracy.
-
-**The shift column is where the experiment now lives.** ECE rises 344× from in-distribution
-to shift, and the sign turns positive — overconfidence. The pilot had to *impose*
-miscalibration with a temperature knob; here it arises on its own from the lab-to-field
-gap, which is the stronger version of the same claim.
-
-**Under shift, the signed error equals the ECE exactly** (both 0.13760501).
-That identity holds only when every reliability bin errs in the same direction, so the
-shift miscalibration is uniformly overconfident rather than a mix that partially cancels.
-Worth stating, because the pilot's refuted H2 found that *direction* governs planner
-performance, not magnitude.
-
-**BASE_ACC is 0.8036, the shift accuracy — settled 19 August 2026.** An earlier draft of
-the split table in `docs/METHOD.md` assigned the role to the `test` split, which measures
-0.9998: a value at the ceiling, replacing the pilot's cited 0.816 (Ahmad et al., 2023).
-That was recorded here as an open decision and is now closed the other way.
-
-| Candidate | Value | Verdict |
-| --- | --- | --- |
-| PlantVillage test | 0.9998 | **Control.** At 0.0004 ECE there is almost no uncertainty left for a planner to consume, and precision is pinned at 1.000 by construction (section *"3. Planners"*). An in-distribution planner sweep measures nothing. |
-| PlantDoc shift | 0.8036 | **BASE_ACC.** The accuracy a deployed scout actually sees, the split the sweep runs on (`pool_split: shift`), and near the pilot's 0.816 — which keeps the two phases comparable. |
-
-The justification lives in `docs/METHOD.md`, section *"2. Perception"* → *"Data"* →
-*"BASE_ACC"*, and the two documents now agree.
-
-⚠️ Augmented-duplicate leakage has not yet been ruled out. The 0.9998 score is consistent with prior results on PlantVillage, a controlled laboratory dataset known to be relatively easy, so the score alone does not indicate a bug. However, preventing augmented versions of the same leaf from being split across the training and test sets depends on _source_key in scoutfield/perception/datasets.py. This mechanism has not yet been verified against the specific dataset mirror used here. This should be verified before the 0.9998 result is reported in a paper.
-
-NLL and Brier at the fitted temperature: **0.0010** / **0.0002** in-distribution,
-**0.8057** / **0.1625** under shift.
+BASE_ACC is the PlantDoc shift accuracy in the table above. The reasons are in
+`docs/METHOD.md`, section *"2. Perception"* → *"Data"* → *"BASE_ACC"*.
 
 ### Temperature sweep
 
 `T` is **relative to the fitted temperature** (`sweep_is_relative_to_fitted_temperature:
 true`), so `T` = 1 is the calibrated point, exactly as in the pilot. Absolute temperature
-is `T` × 0.7723.
+is `T` × the fitted temperature.
 
-Accuracy must be identical down each accuracy column. It is, to six decimal places, on
-all three splits — the instrument works on a real CNN.
+Accuracy must be identical down each accuracy column. If it is not, the instrument is
+broken (`docs/METHOD.md`, section *"1. The instrument"*).
 
-**PlantVillage (test), n = 8,146**
-
-| `T` | Accuracy | ECE | Signed error | Mean confidence |
-| --- | --- | --- | --- | --- |
-| 0.30 | 0.999754 | 0.0002 | +0.0002 | 0.9999 |
-| 0.50 | 0.999754 | 0.0002 | +0.0001 | 0.9999 |
-| 1.00 | 0.999754 | 0.0004 | −0.0003 | 0.9995 |
-| 2.00 | 0.999754 | 0.0031 | −0.0029 | 0.9968 |
-| 3.00 | 0.999754 | 0.0111 | −0.0110 | 0.9888 |
-| 4.00 | 0.999754 | 0.0258 | −0.0257 | 0.9740 |
-
-**PlantDoc (shift), n = 2,922**
+**PlantVillage (test), n = —**
 
 | `T` | Accuracy | ECE | Signed error | Mean confidence |
 | --- | --- | --- | --- | --- |
-| 0.30 | 0.803559 | 0.1771 | +0.1771 | 0.9806 |
-| 0.50 | 0.803559 | 0.1658 | +0.1658 | 0.9693 |
-| 1.00 | 0.803559 | 0.1376 | +0.1376 | 0.9412 |
-| 2.00 | 0.803559 | 0.0863 | +0.0862 | 0.8898 |
-| 3.00 | 0.803559 | 0.0414 | +0.0414 | 0.8450 |
-| 4.00 | 0.803559 | 0.0080 | +0.0028 | 0.8064 |
+| 0.30 | — | — | — | — |
+| 0.50 | — | — | — | — |
+| 1.00 | — | — | — | — |
+| 2.00 | — | — | — | — |
+| 3.00 | — | — | — | — |
+| 4.00 | — | — | — | — |
 
-**The two splits move in opposite directions, and that is the finding.** In-distribution,
-ECE is near-minimal at `T` = 1 and grows as the model is softened — the ordinary picture,
-and the one the pilot's invariant *"ECE is minimised at `T` = 1 and rises in both
-directions"* describes. Under shift, ECE **falls monotonically** across the sweep and is
-minimised at `T` = 4, a 17× reduction from `T` = 0.3.
+**PlantDoc (shift), n = —**
 
-That is not the invariant breaking. It is the temperature fitted on in-distribution
-validation data failing to transfer: under shift the model is overconfident at every
-temperature tested (signed error positive throughout), and softening it by a further
-factor of ~4 — absolute `T` ≈ 3.09 — is what brings mean confidence, 0.8064, into line
-with accuracy, 0.8036.
-
-Two consequences worth stating before the planner sweep:
-
-- **A single fitted temperature does not serve both regimes.** Any deployed system that
-  calibrates on lab data and flies over a field carries roughly the miscalibration in
-  the `T` = 1 row of the shift table, not the test table.
-- **The in-distribution sweep spans an ECE range of 0.0002 to 0.0258.** The pilot's
-  planner effect was driven by a range of 0.0037 to 0.1980. The in-distribution
-  condition may therefore be too well-calibrated to move a planner at all, and the shift
-  condition is where the effect has room to appear. This is one of the two reasons
-  BASE_ACC was settled at the shift accuracy above.
-
-Not yet measured: MC-dropout and deep ensembles (section *"5. Uncertainty methods"*),
-and reliability diagrams per condition. `reliability_at_fitted` and `per_class_at_fitted`
-are present in `results/calibration_sweep.json` but not yet plotted.
+| `T` | Accuracy | ECE | Signed error | Mean confidence |
+| --- | --- | --- | --- | --- |
+| 0.30 | — | — | — | — |
+| 0.50 | — | — | — | — |
+| 1.00 | — | — | — | — |
+| 2.00 | — | — | — | — |
+| 3.00 | — | — | — | — |
+| 4.00 | — | — | — | — |
 
 ---
 
@@ -133,15 +66,14 @@ Roadmap item 4. Source: printed by `experiments/03_train_ppo.py`, `results/summa
 | Quantity | Value |
 | --- | --- |
 | Coverage ceiling (optimistic bound) | 0.391 (analytic, from config) |
-| Measured mean coverage, lawnmower | **0.391** (5 seeds, matches the bound) |
-| Measured mean coverage, PPO | **0.325** (evaluation, `T`=1, 3 policies x 5 seeds) |
-| Field prevalence at `n_parents` = 18 | **0.170** (30 seeds; pilot 12×12 measures 0.1697) |
+| Measured mean coverage, lawnmower | — |
+| Measured mean coverage, PPO | — |
+| Field prevalence at `n_parents` = 18 | — |
 | Morisita index at `sigma` = 1.5 | — |
 
-The coverage bound is verified rather than assumed: a lawnmower sweep attains 0.391,
-confirming the intended ≤40% regime. Prevalence is held at the pilot's value across the
-scale change — see `docs/METHOD.md`, section *"3. Environment"*, for why that required
-changing `n_parents` from 3 to 18 and what happens if it is not done.
+Prevalence is held at the pilot's value across the scale change — see
+`docs/METHOD.md`, section *"3. Environment"*, for why that required changing `n_parents`
+from 3 to 18.
 
 ---
 
@@ -152,72 +84,31 @@ CI over 5 seeds.
 
 ### PPO training
 
-Source: `results/ppo_curve_seed{0,1,2}.json`, 2,000,000 timesteps per seed at `T` = 1.
-These are **training** episodes, not the evaluation sweep. IQM over the first and last 10%
-of episodes.
-
-> These curves are from the **first** training run, on `env.pool_split: test`. The
-> policies were subsequently retrained on `shift` — see *"PPO does not beat the lawnmower,
-> and the training condition was not the reason"* below — and it is the retrained policies
-> that the evaluation tables report. The learning behaviour described here (selectivity,
-> convergence) was not re-measured after the retrain; the final performance was, and
-> barely moved.
+Source: `results/ppo_curve_seed{0,1,2}.json`. These are **training** episodes, not the
+evaluation sweep. IQM over the first and last 10% of episodes.
 
 | Quantity | First 10% | Last 10% | Change |
 | --- | --- | --- | --- |
-| Detections per joule | 0.0950 | 0.1492 | **1.57×** |
-| Recall | 0.354 | 0.549 | 1.55× |
-| Coverage | 0.307 | 0.350 | 1.14× |
-| Time to first detection | 1.48 | 0.99 | 0.67× |
-| Precision | 1.000 | 1.000 | — |
-| False alarms | 0 | 0 | — |
+| Detections per joule | — | — | — |
+| Recall | — | — | — |
+| Coverage | — | — | — |
+| Time to first detection | — | — | — |
+| Precision | — | — | — |
+| False alarms | — | — | — |
 
-All three seeds report `converged: true`. Drift in detections/joule across the final 20%
-of training is +2.0%, +0.14% and +0.32% — flat, by the standard this phase committed to.
-
-**The agent learned selectivity, not just more flying.** Detections per joule rose 1.57×
-while coverage rose 1.14×, so the gain comes from *which* cells were visited rather than
-how many. That is the behaviour the 32×32 scale change and the 0.391 coverage ceiling
-were introduced to make possible, and it is the regime the pilot's 12×12 field could not
-reach. Seed-to-seed spread is small: 1.55×, 1.56×, 1.60×.
-
-> ⚠️ **Precision is exactly 1.000 and false alarms exactly 0 — in every episode, on every
-> seed.** This is not a bug, and it is a problem for the experiment. At `T` = 1 the
-> classifier is 0.9998-accurate in-distribution with ECE 0.0004, so at τ = 0.75 a false
-> positive essentially cannot occur. The precision/recall trade-off is therefore
-> unmeasurable in this condition.
->
-> The pilot's central mechanism was that overconfidence *trades precision for recall*,
-> and its refuted H2 concluded that the direction of miscalibration governs planner
-> performance rather than its magnitude. Neither claim can be tested against a planner
-> whose precision is pinned at 1.0 by construction. Together with the in-distribution ECE
-> range of 0.0002–0.0258 against the pilot's 0.0037–0.1980, this is the second
-> independent indication that the in-distribution condition is degenerate for this
-> study's purpose, and that the shift condition is where the effect has room to appear.
-> **Settled, 13 August 2026: the sweep runs on `shift`.** Under that condition precision
-> moves as the pilot's mechanism predicts — Lawnmower's rises 0.343 → 0.483 from `T` = 1
-> to `T` = 4 as its false alarms fall 102.9 → 44.4 — so the trade-off is measurable and
-> the degeneracy described above applies only to the in-distribution condition, which is
-> now the control rather than the experiment. BASE_ACC followed the same reasoning and was
-> settled at the shift accuracy on 19 August 2026 — see section *"1. Perception"* and
-> `docs/METHOD.md`.
-
-Measured 13 August 2026 from commit `5e83b37`, 630 jobs, `pool_split: shift` for both
-training and evaluation. IQM with 95% stratified bootstrap CI, stratified by evaluation
-seed and by PPO training seed. Source: `results/summary.json`,
-`results/sweep_metadata.json`.
+Convergence per seed (drift in detections/joule across the final 20% of training): —
 
 ### Detections per joule
 
 | Planner | `T`=0.3 | `T`=1.0 | `T`=4.0 | Degradation `T`=1→4 | n per cell |
 | --- | --- | --- | --- | --- | --- |
-| Oracle (greedy, lower bound) | 0.2497 [0.2149, 0.2700] | 0.2478 [0.2142, 0.2671] | 0.2364 [0.2094, 0.2501] | 1.05× | 15 |
-| Lawnmower | 0.0910 [0.0780, 0.1009] | 0.0870 [0.0746, 0.0964] | 0.0683 [0.0589, 0.0756] | **1.27×** | 15 |
-| PPO | 0.0872 [0.0799, 0.0920] | 0.0848 [0.0781, 0.0891] | 0.0663 [0.0616, 0.0693] | 1.28× | 45 |
-| GreedyEntropy | 0.0738 [0.0616, 0.0817] | 0.0612 [0.0505, 0.0693] | 0.0410 [0.0343, 0.0467] | **1.49×** | 15 |
-| Random | 0.0391 [0.0333, 0.0437] | 0.0384 [0.0328, 0.0429] | 0.0350 [0.0299, 0.0393] | 1.10× | 15 |
+| Oracle (greedy, lower bound) | — | — | — | — | — |
+| Lawnmower | — | — | — | — | — |
+| PPO | — | — | — | — | — |
+| GreedyEntropy | — | — | — | — | — |
+| Random | — | — | — | — | — |
 
-PPO has three cells' worth of runs because three independently trained policies were
+PPO has three cells' worth of runs because three independently trained policies are
 evaluated, each across five evaluation seeds and three cluster scales.
 
 ### Regret against the oracle
@@ -226,79 +117,23 @@ At `T` = 1, the calibrated point.
 
 | Planner | Regret on detections/joule | Regret on recall |
 | --- | --- | --- |
-| Lawnmower | 0.1609 | 0.6425 |
-| PPO | 0.1630 | 0.6525 |
-| GreedyEntropy | 0.1866 | 0.7458 |
-| Random | 0.2095 | 0.8297 |
-
-### PPO does not beat the lawnmower, and the training condition was not the reason
-
-The first sweep trained PPO in-distribution and evaluated it under shift. That was a
-genuine confound — PPO was the only planner scored away from where it was fitted — so the
-policies were retrained on the shift split and the sweep re-run in full.
-
-**It changed almost nothing.** PPO scored 0.0857 detections/joule at `T` = 1 when trained
-on `test`, and 0.0848 when trained on `shift`. The gap to the lawnmower was not an
-artefact of the mismatch, and the possibility is now closed rather than argued about.
-
-PPO sits just below the lawnmower at every temperature, but the intervals overlap heavily
-— 0.0848 [0.0781, 0.0891] against 0.0870 [0.0746, 0.0964] at `T` = 1 — so the honest
-statement is that **the two are statistically indistinguishable on detections per joule**,
-not that PPO loses. Their degradation ratios are likewise a match, 1.28× against 1.27×.
-
-The planners do differ in how they reach that result:
-
-| At `T` = 1 | Lawnmower | PPO |
-| --- | --- | --- |
-| Coverage | 0.3906 | 0.3252 |
-| Recall | 0.3411 | 0.3311 |
-| Precision | 0.3433 | 0.3704 |
-| False alarms | 102.9 | 91.2 |
-
-PPO reaches within 3% of the lawnmower's recall while visiting **17% fewer cells**, with
-higher precision and fewer false alarms. It is the more selective planner; it simply does
-not convert that selectivity into a detections-per-joule advantage. The lawnmower spends
-its entire budget covering ground and hits the 0.391 ceiling exactly, which at this field
-scale and prevalence is close to sufficient — and that, rather than a failure of the
-learned policy, is the most likely reason the two tie.
-
-This is the pilot's finding surviving a change of algorithm, of observation, and of field
-scale: a fixed sweep remains hard to beat. It is reported as measured.
+| Lawnmower | — | — |
+| PPO | — | — |
+| GreedyEntropy | — | — |
+| Random | — | — |
 
 The oracle is greedy nearest-diseased-cell, a **lower bound** on the true ceiling, since
 optimal routing under an energy budget is NP-hard. Regret against it therefore
-*understates* the real gap. It is large: the best baseline recovers about a third of the
-oracle's detections per joule and a third of its recall.
+*understates* the real gap.
 
-### Two findings that do not reproduce the pilot
+### Selectivity at `T` = 1
 
-**The 13.4× collapse does not survive a real classifier.** Lawnmower degrades **1.27×**
-from `T` = 1 to `T` = 4, against the pilot's 13.4× — an order of magnitude smaller. The
-effect exists and is in the same direction, but not at the reported magnitude. The pilot's
-ECE range was 0.0037–0.1980; the range reachable here on the shift split is 0.0080–0.1771
-at comparable temperatures, so the manipulation is comparable and the difference lies in
-the perception model, not the sweep.
-
-**The robustness ordering reverses.** The pilot found GreedyEntropy the more robust
-planner — 1.84× against Lawnmower's 13.4× — and reported a ranking reversal at `T` = 4
-where GreedyEntropy beat Lawnmower 7.3×. Here GreedyEntropy is the **least** robust
-non-trivial planner (1.49× against Lawnmower's 1.27×) and is beaten by Lawnmower at every
-temperature. No ranking reversal occurs anywhere in the sweep: the ordering is Oracle >
-Lawnmower > GreedyEntropy > Random at all six temperatures, with PPO between Lawnmower
-and GreedyEntropy when its rows are included.
-
-A mechanism is visible in the false-alarm counts. As `T` rises from 1 to 4, Lawnmower's
-false alarms fall 102.9 → 44.4 and its precision rises 0.343 → 0.483, the precision-for-
-recall trade the pilot describes. GreedyEntropy's false alarms *rise*, 101.3 → 118.7,
-while its precision falls 0.273 → 0.179. An entropy-seeking planner steers toward
-uncertain cells, and softening the classifier manufactures exactly those, so the planner
-is drawn to the cells the miscalibration has corrupted. That coupling between the
-calibration error and the planner's own objective did not appear in the pilot, where the
-learned agent was too weak for its objective to matter.
-
-Both are reported as measured. The pilot's numbers are not wrong for the pilot's
-instrument; what changed is the classifier, which is the contribution this phase exists
-to make.
+| At `T` = 1 | Lawnmower | PPO |
+| --- | --- | --- |
+| Coverage | — | — |
+| Recall | — | — |
+| Precision | — | — |
+| False alarms | — | — |
 
 ---
 
@@ -306,49 +141,18 @@ to make.
 
 Roadmap item 6. Source: `results/tau_sensitivity.csv`.
 
-Measured 13 August 2026 from commit `5e83b37`, `pool_split: shift`, 5 seeds per cell.
 Effect size is the detections-per-joule ratio between `T` = 1 and `T` = 4. PPO runs a
-reduced τ grid because its evaluation is ~30× slower than the baselines.
-
-> **Interval correction, 19 August 2026.** Every `ci_T1` in
-> `results/tau_sensitivity_summary.json` was previously zero-width, and no ratio below is
-> affected — but the reason is worth recording. This sweep ran one job per seed at a
-> single cluster scale and stratified the bootstrap by seed, so every stratum held exactly
-> one observation and resampling within strata could not vary. The estimator returned the
-> point estimate as both bounds: an interval reporting no uncertainty at all.
-> `scoutfield.analysis.stats.stratified_bootstrap_ci` now refuses that case, and the
-> summary was regenerated with a pooled bootstrap, labelled per entry via
-> `ci_stratified_by`. The point estimates are unchanged to 12 decimal places; only the
-> intervals were wrong, and they were never quoted. The sweep driver now runs all three
-> cluster scales for the baselines so a future run is stratified properly — PPO stays on
-> one scale for cost and keeps the labelled pooled interval.
+reduced τ grid because its evaluation is much slower than the baselines'.
 
 | τ | Lawnmower | GreedyEntropy | Random | Oracle | PPO |
 | --- | --- | --- | --- | --- | --- |
-| 0.55 | 1.02× | 1.53× | 1.01× | 1.00× | — |
-| 0.60 | 1.07× | 1.53× | 1.03× | 1.00× | 1.12× |
-| 0.65 | 1.14× | 1.52× | 1.05× | 1.01× | — |
-| 0.70 | 1.20× | 1.52× | 1.08× | 1.02× | — |
-| 0.75 | **1.27×** | **1.52×** | 1.10× | 1.04× | 1.30× |
-| 0.85 | 1.74× | 1.58× | 1.21× | 1.15× | — |
-| 0.90 | **2.32×** | 1.82× | 1.32× | 1.23× | 2.12× |
-
-**The pilot's caveat is confirmed: the effect size is strongly τ-dependent.** Lawnmower's
-degradation more than doubles across the tested range, 1.02× at τ = 0.55 to 2.32× at
-τ = 0.90. Quoting any single figure as "the" effect size is therefore not defensible
-without the threshold attached — which is what the pilot's own threats-to-validity
-section anticipated.
-
-**The dependence is planner-specific, which the pilot did not predict.** GreedyEntropy is
-nearly flat below τ = 0.85 (1.53 → 1.52 → 1.52 → 1.52) and rises only at the extreme,
-while Lawnmower climbs monotonically throughout. The two curves cross between τ = 0.75
-and τ = 0.85: below that, GreedyEntropy degrades more; above it, Lawnmower does. Any claim
-about which planner is more robust to miscalibration is therefore a claim about a τ
-regime, not about the planners.
-
-The oracle's near-invariance (1.00× to 1.23×) is the control working as intended: it plans
-on ground truth, so it should be almost unaffected by classifier calibration, and the
-residual rise at high τ reflects the confirmation threshold alone.
+| 0.55 | — | — | — | — | — |
+| 0.60 | — | — | — | — | — |
+| 0.65 | — | — | — | — | — |
+| 0.70 | — | — | — | — | — |
+| 0.75 | — | — | — | — | — |
+| 0.85 | — | — | — | — | — |
+| 0.90 | — | — | — | — | — |
 
 ---
 
@@ -369,20 +173,18 @@ Roadmap item 7. Source: `results/uncertainty_comparison.json`.
 Roadmap item 9. Source: `results/export_report.json`, written by
 `python -m scoutfield.app.export_onnx`.
 
-Architecture-level numbers, measured on the development laptop. These are properties of
-the exported graph and the machine, not of the weights, so they are valid ahead of
-training — **but the model exported to obtain them was untrained**, and no accuracy or
-calibration number appears in this section for that reason.
+Properties of the exported graph and of the machine it runs on. The hardware is recorded
+with every measurement.
 
 | Metric | Value |
 | --- | --- |
-| ONNX vs PyTorch max logit difference | **2.2e-07** (tolerance 1e-4) |
-| Median latency per image (batch 1) | **11.8 ms** |
-| p95 latency per image (batch 1) | **13.5 ms** |
-| Throughput (batch 1) | **84.8 images/s** |
-| Throughput (batch 8) | 64.0 images/s — batching does not help on this CPU |
-| Hardware | Intel64 Family 6 Model 140 (Tiger Lake), Windows 11 22621, CPU only |
-| ONNX Runtime version | 1.28.0, `CPUExecutionProvider` |
+| ONNX vs PyTorch max logit difference | — (tolerance 1e-4) |
+| Median latency per image (batch 1) | — |
+| p95 latency per image (batch 1) | — |
+| Throughput (batch 1) | — |
+| Throughput (batch 8) | — |
+| Hardware | — |
+| ONNX Runtime version | — |
 
 Re-measure on the target device before quoting any of this as a deployment figure; a
 laptop CPU is not a companion computer.

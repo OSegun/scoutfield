@@ -39,18 +39,10 @@ env:
     hover: 1.0
     translate: 0.6
   # Which split the agent observes through during TRAINING. It must match the
-  # evaluation condition in configs/sweep.yaml.
-  #
-  # Changed from `test` to `shift` on 12 August 2026, and the reason is a result,
-  # not a preference. The first sweep trained PPO on `test` and evaluated it on
-  # `shift`. PPO scored 0.149 detections/joule in training and 0.086 in
-  # evaluation, while the hand-written baselines — having no training
-  # distribution to be outside of — were unaffected. That makes PPO the only
-  # planner evaluated away from where it was fitted, so the comparison measured
-  # the distribution gap rather than the planner.
-  #
-  # Any checkpoint trained before this date used `test` and must be retrained
-  # before its rows are compared with a baseline.
+  # evaluation condition in configs/sweep.yaml. A policy trained on one split and
+  # scored on another would be the only planner evaluated away from where it was
+  # fitted — the hand-written baselines have no training distribution to be outside
+  # of — so the comparison would measure the distribution gap, not the planner.
   pool_split: shift
   observation:
     # The pilot's agent saw only a 5x5 local patch, which is one of the three named
