@@ -279,7 +279,8 @@ subprocess.run(["git", "clone", "--depth", "1", REPO, "/kaggle/working/scoutfiel
 The cell is generated, not hand-written — see `notebooks/_bootstrap.py` and
 `configs/kaggle.yaml`.
 
-Internet **on**, accelerator **GPU**, persistence **variables and files**. Sessions are
+Internet **on**, accelerator **GPU T4 x2** (None for the CPU-only sweep notebook), and the
+`HF_TOKEN` secret attached to each notebook. Sessions are
 killed at nine hours and much sooner when idle, so every long job pushes its progress to
 the artefact store and resumes from there when the notebook is run again. See
 `notebooks/README.md`.
