@@ -51,9 +51,9 @@ each `kernel-metadata.json`, but the UI wins if the two disagree.
 | Setting | Value | Why it matters |
 | --- | --- | --- |
 | Internet | **On** | `pip install git+...` fails without it, often with a confusing SSL error rather than a clear network one |
-| Accelerator | **GPU T4 ×2** / **P100** | fine-tuning is impractical on CPU |
-| Persistence | **Variables and files** | sessions die; see below |
-| Datasets | PlantVillage, PlantDoc | mounted read-only at `/kaggle/input/<slug>` |
+| Accelerator | **GPU T4 ×2** for 01–03, **None** for 04 | the shipped PyTorch cannot run on the P100; the first cell stops if it sees one |
+| Secrets | **HF_TOKEN** attached (Add-ons → Secrets) | every stage writes to the artefact store; the first cell stops without it |
+| Datasets | PlantVillage and PlantDoc, on every notebook | mounted read-only at `/kaggle/input/<slug>` |
 
 ## Sessions get killed — design for it
 
@@ -61,19 +61,16 @@ Kaggle enforces a nine-hour ceiling and disconnects idle sessions far sooner. On
 `/kaggle/working` survives to the notebook's output; anything written elsewhere is
 gone when the session ends.
 
-Every long job checkpoints per epoch or per sweep job via
-`scoutfield.utils.checkpoint` and resumes from disk. Run the sweep in bounded
-chunks so a kill costs one chunk:
+A committed run (**Save Version → Save & Run All**) starts in a clean container, so
+resume state is not kept on Kaggle at all. It lives in the artefact store
+(`configs/artifacts.yaml`): fine-tuning pushes `last.pt` every epoch, PPO pushes its
+resume state every `checkpoint_freq` steps, and the sweeps push their CSV and
+done-registry every `push_every_jobs` jobs. To resume after a session ends, run the same
+notebook again. Notebook 01 also needs `RESUME = True` in its run cell, because
+fine-tuning refuses to resume unless asked to.
 
-```python
-!while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done
-```
-
-Note that persistence covers the *interactive* session. A committed run
-(**Save Version → Save & Run All**) starts in a clean container and keeps only what it
-writes to `/kaggle/working` during that run, so resume state has to be fed back in as an
-attached input or a Dataset. Verify that on your first pair of commits rather than
-assuming it.
+No notebook attaches another's output (`kernel_sources` is empty by design): every input
+comes from the store.
 
 ## GPU quota
 

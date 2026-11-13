@@ -43,8 +43,9 @@ a resumed sweep treats two different runs as the same completed job and skips on
 
 | Step | Command | Runtime | Produces |
 | --- | --- | --- | --- |
-| 1 | `python experiments/01_finetune_perception.py --config configs/perception.yaml` | ~40 min, GPU | `checkpoints/perception/best.pt`, `results/perception_summary.json` |
-| 2 | `python experiments/02_calibrate.py --config configs/perception.yaml` | ~10 min, GPU | `results/calibration_sweep.json` |
+| 0 | `python experiments/00_check_leakage.py --config configs/perception.yaml` | minutes, CPU | `leakage_report.json` (stage `01_perception`) |
+| 1 | `python experiments/01_finetune_perception.py --config configs/perception.yaml` | ~40 min, GPU | `best.pt`, `last.pt`, `perception_summary.json` (stage `01_perception`) |
+| 2 | `python experiments/02_calibrate.py --config configs/perception.yaml` | ~10 min, GPU | `calibration_sweep.json` and three logit pools (stage `02_calibration`) |
 | 3 | `python experiments/03_train_ppo.py --config configs/ppo_field32.yaml --seed 0` | ~2 h/seed, GPU | `checkpoints/ppo/seed0/` |
 | 4 | `while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done` | ~1 h, CPU | `results/sweep_results.csv`, `results/summary.json` |
 | 5 | `python experiments/05_tau_sensitivity.py --config configs/sweep.yaml` | ~3 h, CPU | `results/tau_sensitivity.csv` |
@@ -59,48 +60,35 @@ Repeat step 3 for seeds 0–4. A single seed is not evidence of convergence.
 that feeds it. `make_figures.py` reads `results/summary.json`; if that file is stale the
 figures and the data disagree and nobody notices.
 
-### 2.1 Carrying artefacts between notebooks on Kaggle
+### 2.1 Carrying artefacts between stages
 
-Locally the steps share one working tree and this section does not apply. On Kaggle they
-are four separate kernels with no shared filesystem, and the asymmetry catches everyone
-once: **`/kaggle/working` is the only writable location, and it belongs to a single
-session.** Step 2 cannot see step 1's checkpoint by writing to the same path, because
-that path is empty in a new session.
+On Kaggle the steps are four separate kernels with no shared filesystem:
+`/kaggle/working` is the only writable location and it belongs to a single session. So no
+stage reads another's output from disk. Every stage reads its inputs from, and writes its
+outputs to, the artefact store named in `configs/artifacts.yaml`, a public Hugging Face
+dataset repository:
 
-An earlier notebook's artefacts reach a later one as a read-only mount under
-`/kaggle/input`, by one of two routes:
-
-| Route | How | When to use it |
-| --- | --- | --- |
-| Kernel output | The producing notebook is committed, and the consuming notebook lists it in `kernel_sources` | Default. Generated automatically — see below |
-| Published dataset | Output tab → "New Dataset", then attach it as a normal dataset | When the artefact should be versioned and citable on its own |
-
-`kernel_sources` is generated, never hand-written. Each entry in `NOTEBOOKS` in
-`scripts/make_notebooks.py` declares what it consumes with a `needs` key, and the
-metadata follows from it:
-
-```python
-"dir": "02_calibration_shift",
-"needs": ["01_perception_finetune"],   # consumes checkpoints/perception/best.pt
+```
+runs/<run_id>/manifest.json
+runs/<run_id>/<stage>/<file>
 ```
 
-Code never hard-codes either location. `scoutfield.utils.paths.find_checkpoint` searches
-the writable directory first and every `/kaggle/input` mount after, so the same call
-works in the session that produced the file and in the one that inherited it.
+A missing input raises and names the store path it looked for; an input whose SHA-256
+differs from the manifest raises too. Writing needs a Hugging Face write token: on Kaggle,
+attach the `HF_TOKEN` secret to each notebook (Add-ons → Secrets); on a laptop, run
+`huggingface-cli login`. Reading needs nothing. Setting
+`SCOUTFIELD_ARTIFACT_STORE=<dir>` swaps the hub for a local directory, which runs the
+pipeline fully offline.
 
-**Committing is the step that is easy to forget.** A notebook run interactively keeps
-nothing: `/kaggle/working` is discarded when the session ends, and an uncommitted
-notebook exposes no output to attach. Finish every step with **Save Version → Save & Run
-All (Commit)**, and only then push and run the notebook that depends on it:
+Long stages push their resume state as they go (fine-tuning every epoch, PPO every
+`checkpoint_freq` steps, the sweeps every `push_every_jobs` jobs), so a session that ends
+early is resumed by running the same notebook again. Notebook 01 alone needs
+`RESUME = True` set in its run cell, because resuming fine-tuning is refused unless asked
+for.
 
-```bash
-kaggle kernels push -p notebooks/01_perception_finetune
-```
-
-If a downstream step raises `FileNotFoundError: checkpoint 'perception/best.pt' not
-found`, the message lists every location searched. The cause is almost always one of
-three things: the upstream notebook was never committed, it is not listed in this
-notebook's `kernel_sources`, or the metadata was regenerated but never pushed.
+After each stage, `python scripts/verify_stage.py <stage>` checks it and prints its key
+numbers; `python scripts/pull_artifacts.py --run <run_id>` mirrors a whole run to the
+laptop.
 
 ---
 
@@ -108,9 +96,10 @@ notebook's `kernel_sources`, or the metadata was regenerated but never pushed.
 
 | Number | Source file | Command |
 | --- | --- | --- |
-| Test accuracy (BASE_ACC for this phase) | `results/perception_summary.json` → `accuracy` | step 1 |
-| Accuracy under shift | `results/perception_summary.json` → `accuracy_shift` | step 1 |
-| Fitted temperature | `results/calibration_sweep.json` → `fitted_temperature` | step 2 |
+| In-distribution accuracy (control) | `perception_summary.json` → `accuracy` | step 1 |
+| Accuracy under shift (BASE_ACC: `shift_eval`) | `perception_summary.json` → `accuracy_shift`, `accuracy_shift_eval` | step 1 |
+| Leakage counts | `leakage_report.json` | step 1 |
+| Lab- and shift-fitted temperatures | `calibration_sweep.json` → `lab_fitted_temperature`, `shift_fitted_temperature` | step 2 |
 | ECE per temperature | `results/calibration_sweep.json` | step 2 |
 | Signed calibration error | `results/calibration_sweep.json` | step 2 |
 | Coverage ceiling | printed by step 3; `results/summary.json` → `coverage` | step 3 |

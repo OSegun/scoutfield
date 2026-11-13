@@ -18,12 +18,12 @@ the link is strictly monotone and the decision threshold sits at logit 0, dividi
 the reported confidence. Frenkel and Goldberger (2022) state this property explicitly.
 
 ```
-T = 1   perfectly calibrated (fitted on validation)
+T = 1   calibrated (relative to the fitted reference temperature)
 T < 1   overconfident
 T > 1   underconfident
 ```
 
-**The sweep is applied relative to the fitted temperature.** The pilot's surrogate
+**The sweep is applied relative to a fitted temperature.** The pilot's surrogate
 reported the exactly calibrated posterior at `T = 1` by construction. A real network's
 raw logits are not calibrated, so its ECE bottoms out at the fitted `T*`, not at 1.
 Sweeping the raw temperature would therefore put the calibrated point somewhere other
@@ -31,6 +31,28 @@ than 1, and "T = 4" would denote a different manipulation in each phase. The eff
 divisor is `T* × T`, so sweep `T = 1` is the calibrated point exactly as in the pilot.
 `CNNClassifier` takes `reference_temperature = T*` and applies this internally; the
 `observe()` signature is unchanged.
+
+**Two reference temperatures are fitted, and the planner sweep uses the shift one.**
+A temperature fitted on laboratory validation data does not transfer to field imagery:
+under the PlantVillage-to-PlantDoc shift the network is overconfident at the
+lab-fitted point, so a grid centred there never reaches underconfidence, the half of
+the pilot's grid where most of its effect lay. Stage 02 therefore fits:
+
+| Reference | Fitted on | Used for |
+| --- | --- | --- |
+| `lab_fitted` | PlantVillage `val` | the in-distribution sweeps, and the lab-calibrated condition below |
+| `shift_fitted` | PlantDoc `shift_fit` | the planner sweep, PPO training and the τ sweep (`reference_condition: shift_fitted` in `configs/sweep.yaml` and `configs/ppo_field32.yaml`) |
+
+Relative to `shift_fitted`, `T = 1` is calibrated on field imagery, so the grid
+`0.3 … 4` straddles it as the pilot's did. Stage 02 asserts this: on `shift_eval` the
+signed calibration error must be positive at every `T < 1` and negative at every
+`T > 1`, or the run stops.
+
+**The lab-calibrated condition.** One extra condition (`named_conditions: [lab_fitted]`)
+runs every planner at effective divisor = the lab-fitted temperature on the same
+`shift_eval` pool: a system calibrated in the lab and flown over a field. Its rows are
+labelled `reference_condition = lab_fitted` in the CSV and are kept apart from the
+temperature grid in the summary.
 
 This is why the study is possible with no budget: a real CNN cannot give this
 counterfactual, because accuracy and calibration co-vary under retraining. Only a
@@ -108,13 +130,30 @@ is the only rendering consistent with both PlantDoc's RGB field imagery and an
 ImageNet-pretrained backbone, and because `segmented` removes the background — the very
 cue that fails under shift, so training on it would flatter the model.
 
-**PlantDoc's own train/test split is merged.** PlantDoc is the held-out shift set in its
-entirety, so its internal split carries no meaning in this design, and using half of it
-would discard data for nothing.
+**PlantDoc's own train/test split is merged, then halved for this design.** PlantDoc's
+internal split carries no meaning here. All of it is pooled and then split into two
+halves, stratified by binary label so both keep PlantDoc's class balance
+(`calibration.shift_fit_fraction` = 0.5, `calibration.shift_split_seed` = 0 in
+`configs/perception.yaml`):
 
-**Split by source image, not by file.** Augmented PlantVillage variants circulate widely;
-the same leaf appearing in train and val inflates accuracy and makes the model look better
-calibrated than it is.
+| Split | Role |
+| --- | --- |
+| `shift_fit` | fits the shift temperature; PPO trains on its logit pool |
+| `shift_eval` | every planner is scored on its logit pool; BASE_ACC is its accuracy |
+
+No image both fits the calibration point and is evaluated against it, and no policy is
+scored on the logits it trained on.
+
+**Split by source image and by content, not by file.** Augmented PlantVillage variants
+circulate widely; the same leaf appearing in train and val inflates accuracy and makes the
+model look better calibrated than it is. Images are grouped before splitting, and two
+images join a group when they share a source key (the filename with augmentation
+suffixes removed) **or** have byte-identical contents (SHA-1 of the file). Links chain, so
+a group is a connected component. The same grouping is applied to the PlantDoc halves.
+`experiments/00_check_leakage.py` runs before fine-tuning and counts source keys and
+identical files found in more than one split (both must be zero), identical files shared
+between PlantVillage and PlantDoc, and what a split by source key alone would have left
+on both sides. Its report is `leakage_report.json` in stage `01_perception`.
 
 **Validation fits the temperature, so it cannot also drive early stopping.** Doing both
 leaks the calibration fit into model selection. PlantVillage is therefore split three
@@ -128,12 +167,12 @@ ways, not two:
 
 #### BASE_ACC
 
-**BASE_ACC is the PlantDoc shift accuracy**, read from `results/perception_summary.json`
-(`accuracy_shift`), not the accuracy on the PlantVillage `test` split. Three reasons, in
-order of weight:
+**BASE_ACC is the PlantDoc `shift_eval` accuracy**, read from
+`results/perception_summary.json` (`accuracy_shift_eval`), not the accuracy on the
+PlantVillage `test` split. Three reasons, in order of weight:
 
 1. **It is the accuracy the sweep actually runs at.** `configs/sweep.yaml` sets
-   `pool_split: shift`, so every planner number in `docs/RESULTS.md` is produced against a
+   `pool_split: shift_eval`, so every planner number in `docs/RESULTS.md` is produced against a
    classifier operating at the shift accuracy. A BASE_ACC drawn from a split the
    experiment does not use would describe nothing that was measured.
 2. **The in-distribution condition is degenerate for this study's question.** PlantVillage
@@ -155,8 +194,10 @@ condition, and its accuracy is not BASE_ACC.
 
 | Parameter | Value | Source |
 | --- | --- | --- |
-| Temperature fit | LBFGS on log-T, NLL on validation | Guo et al. (2017) |
+| Temperature fit | LBFGS on log-T, NLL; lab on PlantVillage `val`, shift on PlantDoc `shift_fit` | Guo et al. (2017) |
+| Shift split | `shift_fit_fraction` = 0.5, `shift_split_seed` = 0, stratified by binary label | the fit needs one scalar, the evaluation needs a pool per class; half each way |
 | Temperature sweep | 0.30, 0.50, 1.00, 2.00, 3.00, 4.00 | matches the pilot exactly, so the two phases are directly comparable |
+| Sweeps written | `val`, `test` relative to lab; `shift_eval` relative to shift; `shift_eval` relative to lab | the third is the planner condition, the fourth the lab-calibrated one |
 | ECE bins | 15, equal-width | matches the pilot's convention. Two ECE implementations with different binning give different numbers; comparing this phase's ECE to the pilot's 0.0037 / 0.1980 only means something if both were computed the same way — so import the pilot's implementation rather than rewriting it. |
 | MC-dropout samples | 30 | diminishing returns beyond ~30 for a single dropout layer |
 | Ensemble members | 5 | ~10 GPU-minutes each is affordable within a weekly quota; more is not. State the constraint rather than leaving the choice unexplained. Members must differ in initialisation *and* data order — ensembling checkpoints that differ only in data order understates real ensemble diversity. |
@@ -174,12 +215,17 @@ a split, the logits are cached by true label, and `CNNClassifier.observe(label)`
 that cache. Temperature acts only on logits, so caching is exact rather than approximate —
 no fidelity is lost relative to running the network each time.
 
-Which split the cache comes from **is the experimental condition**, and the two are not
-interchangeable: `test` is in-distribution PlantVillage, `shift` is PlantDoc field
-imagery. Pools are stored under split-keyed filenames so one cannot silently stand in for
-the other, the condition is written into every row of `results/sweep_results.csv`, and
-training and evaluation must use the same one: a policy trained on one split and scored
-on another would be the only planner evaluated away from where it was fitted.
+Which split the cache comes from **is the experimental condition**. Stage 02 builds three
+pools: `shift_fit` (PPO trains on it), `shift_eval` (every planner is scored on it) and
+`test` (in-distribution PlantVillage, the control). Training and scoring use the two
+halves of one field condition, so PPO is not scored on the logits it trained on, and is
+not the only planner evaluated away from the distribution it was fitted on.
+
+Each pool file carries a hash of its split's sorted member list, and
+`calibration_sweep.json` records the hash each split should have. A pool whose hash does
+not match is rebuilt from the stage 01 checkpoint, and the rebuild must then match the
+recorded hash, or the run stops: the data on that machine is not the data the run used.
+The pool and condition are written into every row of `results/sweep_results.csv`.
 
 **Limitation: the pool is finite, and small on the shift split.** PlantDoc holds a few
 thousand images, with healthy leaves the minority class, while a single episode can
@@ -194,7 +240,8 @@ supply unlimited independent draws. The trade is deliberate — the empirical di
 is the real classifier's, including whatever asymmetry and heavy tails it has, which is
 the point of this phase — but it means confidence intervals over episodes understate
 variance slightly, and a result resting on differences smaller than the pool's granularity
-should not be trusted. Report the pool sizes alongside any such result.
+should not be trusted. Report the pool sizes alongside any such result; they are in
+`calibration_sweep.json` under `pools`.
 
 ---
 
@@ -315,9 +362,53 @@ ceiling.
 **Never mean ± std over three seeds.** It is the commonest reason RL results fail to
 replicate.
 
+### Metrics
+
+Declared 13 November 2026, before the full re-run.
+
+| Metric | Role | Definition, per episode, then averaged over a run's episodes |
+| --- | --- | --- |
+| Detections per joule | **primary**, as in the pilot | confirmed true positives / energy spent |
+| F1 | secondary | 2 × precision × recall / (precision + recall); 0 when both are 0 |
+| False alarms per joule | secondary | confirmed false positives / energy spent |
+
+Detections per joule counts true positives only, so an overconfident classifier, which
+confirms more cells, can raise it while confirming more healthy cells as diseased. The two
+secondary metrics expose that cost: F1 brings precision back in, and false alarms per joule
+prices the false confirmations on the same energy scale as the primary metric. Both are
+reported beside the primary metric; neither replaces it.
+
+### Degradation spans
+
+The detections-per-joule ratio is reported over three spans of the temperature grid
+(`degradation_spans` in `configs/sweep.yaml`), each as the IQM at the lower temperature
+over the IQM at the higher, with a stratified bootstrap interval on the ratio and the
+probability that a run at the lower temperature beats a run at the higher:
+
+| Span | Temperatures | Pilot Lawnmower | Pilot GreedyEntropy |
+| --- | --- | --- | --- |
+| full | 0.3 → 4 | 13.41× | 1.84× |
+| overconfident | 0.3 → 1 | 1.23× | 1.59× |
+| underconfident | 1 → 4 | 10.86× | 1.16× |
+
+The pilot values are from `scoutplan/results/summary.json` at `v1.0.0` (`dpj_iqm`). Most of
+the pilot's collapse lies on the underconfident half, so a comparison between the phases is
+like-for-like only span by span.
+
 ---
 
-## 6. References
+## 6. Where results live
+
+Every stage reads its inputs from, and writes its outputs to, one public Hugging Face
+dataset repository named in `configs/artifacts.yaml`, under `runs/<run_id>/<stage>/`. Each
+run's `manifest.json` records every file's SHA-256, the commit of this repository that
+produced it, and the files each stage read, so every number traces to its exact inputs.
+`scripts/pull_artifacts.py --run <run_id>` mirrors a run locally;
+`scripts/verify_stage.py <stage>` checks one.
+
+---
+
+## 7. References
 
 - Agarwal, R., Schwarzer, M., Castro, P. S., Courville, A., & Bellemare, M. G. (2021).
   Deep reinforcement learning at the edge of the statistical precipice. *NeurIPS 34*.

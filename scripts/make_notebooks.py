@@ -58,21 +58,27 @@ NOTEBOOKS = [
         "dir": "01_perception_finetune",
         "title": "scoutfield 01 Perception Finetune",
         "gpu": True,
-        # Keys into `data.kaggle_slugs` in configs/perception.yaml, not slugs.
-        "datasets": ["plantvillage"],
+        # Keys into `data.kaggle_slugs` in configs/perception.yaml, not slugs. The
+        # leakage check hashes PlantDoc as well, so both are attached.
+        "datasets": ["plantvillage", "plantdoc"],
         "purpose": (
-            "Fine-tune EfficientNet-B0 on PlantVillage.\n\n"
-            "Roadmap item 1. Produces a checkpoint and `results/perception_summary.json`, "
-            "whose measured accuracy becomes the BASE_ACC of this phase, replacing the "
-            "pilot's cited 0.816.\n\n"
-            "Checkpoints every epoch: a session killed at epoch 11 of 12 must resume, "
-            "not restart."
+            "Leakage check, then fine-tune EfficientNet-B0 on PlantVillage.\n\n"
+            "Roadmap item 1. Writes `leakage_report.json`, `best.pt`, `last.pt` and "
+            "`perception_summary.json` to stage `01_perception` of the artefact store. "
+            "`last.pt` is pushed every epoch.\n\n"
+            "If the session dies part-way through training, set `RESUME = True` in the "
+            "run cell and run again: it continues from the last finished epoch."
         ),
         "calls": [
-            "!python experiments/01_finetune_perception.py --config configs/perception.yaml",
+            "RESUME = False   # True continues this run from 01_perception/last.pt",
             "",
-            "import json",
-            "print(json.load(open('results/perception_summary.json')))",
+            "!python experiments/00_check_leakage.py --config configs/perception.yaml",
+            "assert _exit_code == 0, 'leakage check failed; see the output above'",
+            "",
+            "RESUME_FLAG = '--resume' if RESUME else ''",
+            ("!python experiments/01_finetune_perception.py --config configs/perception.yaml"
+             " $RESUME_FLAG"),
+            "assert _exit_code == 0, 'fine-tuning failed; see the output above'",
         ],
     },
     {
@@ -82,90 +88,66 @@ NOTEBOOKS = [
         "title": "scoutfield 02 Calibration Shift",
         "gpu": True,
         "datasets": ["plantvillage", "plantdoc"],
-        # Consumes checkpoints/perception/best.pt from notebook 01.
-        "needs": ["01_perception_finetune"],
         "purpose": (
-            "Fit the temperature on validation, sweep it, and evaluate the distribution "
-            "shift on PlantDoc.\n\n"
-            "Roadmap items 2, 3 and 7. The critical assertion lives here: accuracy must "
-            "be invariant across the temperature sweep to four decimal places. If it is "
-            "not, the instrument is broken and nothing downstream is interpretable."
+            "Fit the lab and shift temperatures, sweep both, build the logit pools.\n\n"
+            "Roadmap items 2 and 3. Reads `01_perception/best.pt` from the artefact "
+            "store and writes `calibration_sweep.json` and three logit pools to stage "
+            "`02_calibration`. It stops if accuracy moves with temperature, or if the "
+            "signed calibration error on `shift_eval` does not change sign at T = 1."
         ),
         "calls": [
             "!python experiments/02_calibrate.py --config configs/perception.yaml",
-            "",
-            "import json",
-            "sweep = json.load(open('results/calibration_sweep.json'))",
-            "# The file is {config, checkpoint, fitted_temperature, splits}; the sweep",
-            "# sits under each split. Invariance is asserted per split — pooling the",
-            "# three would compare accuracies that were never meant to be equal.",
-            "for split, summary in sweep['splits'].items():",
-            "    accs = {round(r['accuracy'], 4) for r in summary['sweep'].values()}",
-            "    assert len(accs) == 1, f'instrument broken on {split}: {accs}'",
-            "    print(f'{split:>6}: accuracy invariant at', accs.pop())",
+            "assert _exit_code == 0, 'calibration failed; see the output above'",
         ],
     },
     {
         "dir": "03_ppo_training",
         "title": "scoutfield 03 PPO Training",
         "gpu": True,
-        # PlantVillage is the fallback, not the primary route: the planner consumes
-        # cached logits, and only needs the images if that cache is missing.
-        "datasets": ["plantvillage"],
-        # The classifier checkpoint from 01, and 02's cached logit pool — without
-        # the pool, every episode would re-run the network per observation.
-        "needs": ["01_perception_finetune", "02_calibration_shift"],
+        # The pools normally come from the store. Both datasets are attached so a
+        # pool can be rebuilt if its recorded split does not match.
+        "datasets": ["plantvillage", "plantdoc"],
         "purpose": (
-            "Train PPO on the 32x32 field with the global belief map.\n\n"
-            "Roadmap items 4 and 5. The script verifies the coverage ceiling before "
-            "training and refuses to run outside the intended regime — the pilot's "
-            "budget permitted near-total coverage, which is why adaptive planning had "
-            "nothing to buy.\n\n"
-            "Train at least three seeds. A single learning curve is not evidence of "
-            "convergence."
+            "Train PPO on the 32x32 field, one policy per training seed.\n\n"
+            "Roadmap items 4 and 5. Trains on the `shift_fit` pool at the shift-fitted "
+            "temperature. Resume state and the learning curve are pushed to stage "
+            "`03_ppo` periodically, so if the session ends, run the notebook again: "
+            "finished seeds are skipped and an unfinished one resumes."
         ),
         "calls": [
-            "for seed in range(3):",
-            "    !python experiments/03_train_ppo.py --config configs/ppo_field32.yaml --seed {seed}",
+            "import yaml",
+            "SEEDS = yaml.safe_load(open('configs/sweep.yaml'))['ppo_train_seeds']",
+            "for seed in SEEDS:",
+            ("    !python experiments/03_train_ppo.py --config configs/ppo_field32.yaml"
+             " --seed {seed}"),
+            "    assert _exit_code == 0, f'PPO seed {seed} failed; see the output above'",
         ],
     },
     {
         "dir": "04_evaluation_sweep",
         "title": "scoutfield 04 Evaluation Sweep",
         "gpu": False,
-        # The sweep runs on the shift condition, so PlantDoc is the fallback here.
-        # Normally neither is touched: 02's cached pools arrive via `needs`.
         "datasets": ["plantvillage", "plantdoc"],
-        # Evaluates the trained PPO policies against the same classifier and pool.
-        "needs": ["01_perception_finetune", "02_calibration_shift",
-                  "03_ppo_training"],
         "purpose": (
-            "Full evaluation sweep, tau sensitivity, and figures.\n\n"
-            "Roadmap items 6 and 8. CPU is enough: evaluation is thousands of short "
-            "episodes where per-step transfer latency dominates.\n\n"
-            "Run in bounded chunks so a killed session costs one chunk, not the whole "
-            "sweep. To restart cleanly, delete BOTH results/_done.json and the results "
-            "CSV — deleting one leaves the driver mixing old and new results with no "
-            "warning."
+            "Evaluation sweep, tau sweep and figures.\n\n"
+            "Roadmap items 6 and 8. CPU is enough. Progress is pushed to the artefact "
+            "store every 25 jobs, so if the session ends, run the notebook again: it "
+            "resumes from the store and skips finished jobs."
         ),
         "calls": [
-            "# The loop stops on any non-zero exit, so the exit code is reported rather",
-            "# than discarded: 1 = every job done, 2 = aborted with jobs remaining.",
-            "# Without this a crash and a finished sweep look identical, and the only",
-            "# symptom is a summary that was never written.",
-            "!bash -c 'while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done; "
-            "code=$?; echo \"sweep loop exited with $code\"; exit 0'",
-            "",
-            "# Guard the rest of the cell: the tau analysis and the figures both read",
-            "# the sweep summary, and running them on a partial sweep produces plots",
-            "# that look finished.",
-            "import os",
-            "assert os.path.exists('results/summary.json'), (",
-            "    'summary.json missing: the sweep did not complete. Re-run the cell "
-            "above; it resumes from results/_done.json.')",
+            "# The sweep exits 0 while jobs remain, 1 when every job is done and 2 if it",
+            "# aborted, so the loop's final exit code says which one happened.",
+            ("!bash -c 'while JOB_BUDGET=60 python experiments/04_sweep.py; do :; done; "
+             "echo $? > /tmp/sweep_exit'"),
+            "SWEEP_EXIT = int(open('/tmp/sweep_exit').read())",
+            "assert SWEEP_EXIT == 1, (f'sweep aborted (exit {SWEEP_EXIT}); see the output '",
+            "                         'above. Running again resumes from the store.')",
             "",
             "!python experiments/05_tau_sensitivity.py --config configs/sweep.yaml",
+            "assert _exit_code == 0, 'tau sweep failed; see the output above'",
+            "",
             "!python experiments/make_figures.py",
+            "assert _exit_code == 0, 'figures failed; see the output above'",
         ],
     },
 ]
@@ -190,7 +172,8 @@ def build_notebook(spec: dict, settings: dict) -> dict:
         md(f"# {spec['title']}\n\n{spec['purpose']}\n\n"
            "> Logic lives in `scoutfield/` and `experiments/`. This notebook orchestrates: "
            "install, configure, call, display.\n"),
-        code(render_bootstrap(settings["repo"], settings["branch"]).strip()),
+        code(render_bootstrap(settings["repo"], settings["branch"], gpu=spec["gpu"],
+                              kernel=kernel_id(spec, settings)).strip()),
         md("## Run\n"),
         code("\n".join(spec["calls"])),
     ]
@@ -211,6 +194,10 @@ def slugify(title: str) -> str:
     Lowercase, non-alphanumerics collapsed to single hyphens, ends trimmed.
     """
     return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+def kernel_id(spec: dict, settings: dict) -> str:
+    return f"{settings['user']}/scoutfield-" + spec["dir"].replace("_", "-")
 
 
 def build_metadata(spec: dict, settings: dict) -> dict:
@@ -245,13 +232,9 @@ def build_metadata(spec: dict, settings: dict) -> dict:
         "enable_internet": "true",
         "dataset_sources": [slugs[k] for k in spec["datasets"]],
         "competition_sources": [],
-        # Checkpoints cross notebooks as attached kernel output: /kaggle/working is
-        # writable but per-session, so a later notebook receives an earlier one's
-        # artefacts read-only under /kaggle/input. `utils.paths.find_checkpoint`
-        # searches there. The producing notebook must have a committed version
-        # (Save Version -> Save & Run All) or the mount is empty.
-        "kernel_sources": [f"{settings['user']}/scoutfield-{d.replace('_', '-')}"
-                           for d in spec.get("needs", [])],
+        # No kernel_sources: no notebook reads another's output through a Kaggle
+        # mount. Every stage reads its inputs from the artefact store
+        # (configs/artifacts.yaml), so where Kaggle would have mounted them is moot.
         "model_sources": [],
     }
 
