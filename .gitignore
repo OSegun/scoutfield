@@ -49,3 +49,6 @@ data/
 htmlcov/
 kaggle.json
 .DS_Store
+
+# ------------------------------------------------------- artefact store cache
+.artifact_cache/

@@ -7,6 +7,8 @@ scoutplan @ git+https://github.com/OSegun/scoutplan.git@v1.0.0
 
 numpy>=1.24
 pyyaml>=6.0
+# the artefact store every stage reads from and writes to
+huggingface_hub>=0.24
 
 # perception
 torch>=2.2

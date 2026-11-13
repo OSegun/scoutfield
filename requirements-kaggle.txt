@@ -18,3 +18,5 @@ scoutplan @ git+https://github.com/OSegun/scoutplan.git@v1.0.0
 gymnasium>=0.29
 stable-baselines3>=2.3
 pyyaml>=6.0
+# The artefact store: every notebook reads its inputs from it and writes its outputs to it.
+huggingface_hub>=0.24
