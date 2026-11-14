@@ -1,6 +1,7 @@
 """
 Choose the demonstration's sample images by rule, from the stage 02 records.
 
+    python experiments/08_select_samples.py --plan    # which images, and how to fetch them
     python experiments/08_select_samples.py           # writes the local sample folders
     python experiments/08_select_samples.py --push    # also files the PlantDoc ones
 
@@ -41,8 +42,9 @@ def _dataset_root(name: str) -> Path:
     root = data_dir(slug)
     if not root.exists():
         raise FileNotFoundError(
-            f"dataset {name!r} not found at {root}. Download the Kaggle dataset {slug} "
-            f"and unpack it there, then run this script again."
+            f"dataset {name!r} not found at {root}. Run this script with --plan to "
+            f"download only the chosen images from the Kaggle dataset {slug}, or unpack "
+            f"the whole dataset there, then run it again."
         )
     return root
 
@@ -65,12 +67,43 @@ def _write(folder: Path, picks: list[dict], dataset: str, root: Path, licence: s
     return listed
 
 
+def _print_plan(chosen: dict) -> None:
+    """One Kaggle command per chosen image, saving it where ``find_image`` looks.
+
+    Only these few files are needed, not the whole datasets. Each lands in
+    ``data/<dataset folder>/<class folder>/``, so its last three path components
+    are the image key recorded in the pool.
+    """
+    from posixpath import join
+
+    slugs = load_config(repo_root() / "configs" / "perception.yaml")         .section("data")["kaggle_slugs"]
+    for name, (picks, prefix) in chosen.items():
+        slug = slugs[name]
+        target = data_dir(slug).relative_to(repo_root())
+        print(f"# {name}: {len(picks)} images from Kaggle {slug}")
+        for pick in picks:
+            key = Path(pick["key"])
+            remote = join(prefix, key.as_posix()) if prefix else key.as_posix()
+            dest = (target / key.parent).as_posix()
+            print(f'kaggle datasets download -d {slug} -f "{remote}" -p "{dest}"')
+    print("# then run this script again without --plan")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--push", action="store_true",
                         help="file the PlantDoc samples in stage 08_deployment")
+    parser.add_argument("--plan", action="store_true",
+                        help="choose the images and print a Kaggle command to download "
+                             "each one, instead of needing the whole datasets")
+    parser.add_argument("--plantdoc-prefix", default="",
+                        help="folder(s) inside the Kaggle PlantDoc dataset above the "
+                             "image keys, if any, for --plan")
+    parser.add_argument("--plantvillage-prefix", default="",
+                        help="folder(s) inside the Kaggle PlantVillage dataset above the "
+                             "image keys, if any, for --plan")
     args = parser.parse_args()
 
     config = load_deployment_config(args.config)
@@ -83,12 +116,18 @@ def main() -> None:
         store.pull("02_calibration", logit_pool_filename(settings.pool_split)),
         int(cfg["plantdoc_correct_diseased"]), int(cfg["plantdoc_correct_healthy"]),
         int(cfg["plantdoc_wrong"]))
-    public = _write(out / "samples_public", plantdoc, "plantdoc", _dataset_root("plantdoc"),
-                    str(cfg["licences"]["plantdoc"]), "plantdoc")
-
     n = int(cfg["plantvillage_per_class"])
     plantvillage = demo.select_samples(store.pull("02_calibration", logit_pool_filename("test")),
                                        n, n, 0)
+
+    if args.plan:
+        _print_plan({"plantdoc": (plantdoc, args.plantdoc_prefix),
+                     "plantvillage": (plantvillage, args.plantvillage_prefix)})
+        return
+
+    public = _write(out / "samples_public", plantdoc, "plantdoc", _dataset_root("plantdoc"),
+                    str(cfg["licences"]["plantdoc"]), "plantdoc")
+
     local = _write(out / "samples_local", plantvillage, "plantvillage",
                    _dataset_root("plantvillage"), str(cfg["licences"]["plantvillage"]),
                    "plantvillage")
