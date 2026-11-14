@@ -102,8 +102,13 @@ class ScoutPlanInference:
         tensor = _transforms(self.image_size, train=False)(image)
         return tensor.unsqueeze(0).numpy().astype(np.float32)
 
-    def predict(self, image) -> dict:
-        """Return ``{"probability": float, "prediction": int, "logit": float}``.
+    def predict(self, image, relative_temperature: float = 1.0) -> dict:
+        """Return the probability, the prediction and the raw logit for one image.
+
+        ``relative_temperature`` is the experiment's T: it multiplies the fitted
+        temperature, exactly as ``CNNClassifier.observe`` divides by
+        ``reference_temperature * T``. So T = 1 gives the calibrated probability,
+        T < 1 an overconfident one and T > 1 an underconfident one.
 
         The raw logit is included deliberately — it is what temperature scaling
         acts on, so exposing it lets the interface show what recalibration is
@@ -111,7 +116,8 @@ class ScoutPlanInference:
         """
         batch = self.preprocess(image) if not isinstance(image, np.ndarray) else image
         logit = float(self.session.run([OUTPUT_NAME], {INPUT_NAME: batch})[0].ravel()[0])
-        probability = 1.0 / (1.0 + np.exp(-np.clip(logit / self.temperature, -60, 60)))
+        effective = self.temperature * float(relative_temperature)
+        probability = 1.0 / (1.0 + np.exp(-np.clip(logit / effective, -60, 60)))
         return {
             "logit": logit,
             "probability": float(probability),
@@ -120,5 +126,9 @@ class ScoutPlanInference:
             "uncalibrated_probability": float(
                 1.0 / (1.0 + np.exp(-np.clip(logit, -60, 60)))
             ),
+            # The fitted (reference) temperature, the T applied on top of it, and
+            # the divisor actually used.
             "temperature": self.temperature,
+            "relative_temperature": float(relative_temperature),
+            "effective_temperature": effective,
         }

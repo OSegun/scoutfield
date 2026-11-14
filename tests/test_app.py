@@ -209,3 +209,107 @@ def test_latency_without_an_export_names_the_command(store, monkeypatch, tmp_pat
     monkeypatch.setattr(export_onnx, "work_dir", lambda cfg, run: tmp_path)
     with pytest.raises(FileNotFoundError, match="08_export_onnx.py"):
         export_onnx.run_latency(store=store)
+
+
+# ------------------------------------------------- demo correctness (Panels 1, 2)
+
+FITTED = 3.3843  # any value other than 1 shows whether the fitted temperature is used
+
+
+def _sigmoid(z):
+    return 1.0 / (1.0 + np.exp(-z))
+
+
+def test_panel1_slider_at_one_gives_the_calibrated_probability(exported, tmp_path):
+    """Slider = 1 must divide the logit by the fitted temperature, not by 1."""
+    import json
+
+    from PIL import Image
+
+    from scoutfield.app.inference import ScoutPlanInference
+
+    results = tmp_path / "calibration_sweep.json"
+    results.write_text(json.dumps({"shift_fitted_temperature": FITTED,
+                                   "lab_fitted_temperature": 0.99}), encoding="utf-8")
+    model = ScoutPlanInference.from_results(exported["onnx"], results_json=results,
+                                            condition="shift_fitted")
+    image = Image.fromarray((np.random.default_rng(1).random((240, 240, 3)) * 255)
+                            .astype("uint8"))
+
+    at_one = model.predict(image, relative_temperature=1.0)
+    assert at_one["probability"] == pytest.approx(_sigmoid(at_one["logit"] / FITTED))
+    assert at_one["effective_temperature"] == pytest.approx(FITTED)
+
+    at_four = model.predict(image, relative_temperature=4.0)
+    assert at_four["probability"] == pytest.approx(_sigmoid(at_four["logit"] / (4 * FITTED)))
+    assert at_four["prediction"] == at_one["prediction"]
+
+
+def _synthetic_calibration_store(store, tmp_path, split="shift_eval"):
+    """Stage 02 as the sweep reads it, with a tiny synthetic pool: no network, no CNN."""
+    import json
+
+    from scoutfield.perception.adapter import logit_pool_filename, save_logit_pool
+
+    rng = np.random.default_rng(0)
+    pool = {0: rng.normal(-1.5, 1.0, 60), 1: rng.normal(1.5, 1.0, 60)}
+    pool_path = tmp_path / logit_pool_filename(split)
+    save_logit_pool(pool_path, pool, membership="m-synthetic", split=split)
+    cal = tmp_path / "calibration_sweep.json"
+    cal.write_text(json.dumps({"shift_fitted_temperature": FITTED,
+                               "lab_fitted_temperature": 0.99,
+                               "pools": {split: {"membership": "m-synthetic"}}}),
+                   encoding="utf-8")
+    store.push("02_calibration", [cal, pool_path], "synthetic stage 02")
+    return pool
+
+
+def test_panel2_observes_the_sweep_pool_at_the_shift_fitted_reference(store, tmp_path):
+    from scoutfield.app import demo
+
+    settings = demo.load_settings()
+    # The conditions come from the sweep's own config, not from the app.
+    assert settings.pool_split == "shift_eval"
+    assert settings.reference_condition == "shift_fitted"
+
+    expected = _synthetic_calibration_store(store, tmp_path, settings.pool_split)
+    pool = demo.load_pool(settings.pool_split, store=store)
+    reference = demo.fitted_temperature(settings.reference_condition, store=store)
+    assert reference == pytest.approx(FITTED)
+    for label in (0, 1):
+        np.testing.assert_allclose(pool[label], expected[label])
+
+    run = demo.run_episode(demo.make_planner("lawnmower", 0), settings, pool, reference,
+                           temperature=4.0, seed=0)
+    clf = run["classifier"]
+    assert clf.pool_split == "shift_eval"
+    assert clf.reference_temperature * clf.T == pytest.approx(4.0 * FITTED)
+    assert run["env"].tau == settings.tau
+    for key in ("recall", "precision", "detections_per_joule", "coverage"):
+        assert key in run["info"]
+
+
+def test_panel2_runs_without_importing_torch(store, tmp_path):
+    """Panel 2 must not need PyTorch: the hosted app has none."""
+    import subprocess
+    import sys
+
+    _synthetic_calibration_store(store, tmp_path)
+    script = (
+        "import sys\n"
+        "from scoutfield.app import demo\n"
+        "from scoutfield.utils.artifacts import ArtifactStore, LocalBackend\n"
+        f"store = ArtifactStore(LocalBackend(r'{store.backend.root}'), 'rtest', "
+        f"r'{tmp_path / 'cache2'}')\n"
+        "s = demo.load_settings()\n"
+        "pool = demo.load_pool(s.pool_split, store=store)\n"
+        "ref = demo.fitted_temperature(s.reference_condition, store=store)\n"
+        "for name in demo.BASELINES:\n"
+        "    demo.run_episode(demo.make_planner(name, 0), s, pool, ref, 1.0, 0)\n"
+        "assert 'torch' not in sys.modules, 'torch was imported'\n"
+        "print('ok')\n"
+    )
+    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True,
+                         timeout=300, check=False)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip().endswith("ok")
