@@ -69,3 +69,90 @@ latency:
   # measured and reported against the same hardware record.
   intra_op_threads: [0, 1]
   output_file: deployment_latency.json
+
+policy:
+  # The PPO policy shown in the demonstration: the one trained with the top-level
+  # `seed` of configs/sweep.yaml (0), the same policy the tau sweep evaluates.
+  checkpoint_stage: 03_ppo
+  checkpoint_file: ppo_seed0.zip
+  # Exported to ONNX so the demonstration runs it with onnxruntime, without
+  # PyTorch or Stable-Baselines3. Only the actor is exported: observation in, one
+  # score per action out. The deterministic action is the highest score, which is
+  # what Stable-Baselines3 returns for a discrete action space when asked for a
+  # deterministic action.
+  opset: 18
+  policy_file: policy_ppo_seed0.onnx
+  record_file: policy_export_record.json
+  verify:
+    # The ONNX policy must pick the same action as the Stable-Baselines3 policy on
+    # at least this many observations from the real environment: PPO's own
+    # episodes on the 32x32 field, observing the PlantDoc shift_eval pool at the
+    # shift-fitted reference, as in the sweep. Any single mismatch fails the export.
+    min_observations: 1000
+    # Episodes are collected at every one of these temperatures, so the check
+    # covers the overconfident, calibrated and underconfident beliefs the policy
+    # meets in the sweep.
+    temperatures: [0.30, 1.00, 4.00]
+    # Evaluation seeds cycled through until min_observations is reached.
+    seeds: [0, 1, 2, 3, 4]
+    # Largest |ONNX score - PyTorch score| accepted, reported beside the action
+    # check. The action is an arg-max, so only a difference larger than the gap
+    # between the two best scores could change it; the action check is the test
+    # that matters, and this bound catches a graph that is numerically off.
+    logit_atol: 1.0e-4
+
+demo:
+  # Where the demonstration reads its files: `store` (the public artefact store,
+  # read-only, no token: hosted tiers) or `offline` (the local folder below, filled
+  # once by experiments/08_fill_demo_folder.py: the laptop tier). The environment
+  # variable SCOUTFIELD_DEMO_SOURCE overrides this value.
+  source: store
+  # Shown at the top of the page: the project's short name (the README heading,
+  # capitalised for display) and its full title.
+  page_title: ScoutField
+  project_title: >-
+    Development of a Calibration-Aware UAV Path Planning Model for Efficient Crop
+    Disease Detection Under Limited Battery Capacity
+  # Where the page sends someone who wants the method and the numbers.
+  repository_url: https://github.com/OSegun/scoutfield
+  # The offline folder, gitignored. It holds a copy of the store files the app reads,
+  # laid out as the store lays them out and checked against the run's manifest, plus
+  # sample images.
+  offline_dir: .demo_offline
+  # Store files the app reads, beyond the logit pool and calibration results it
+  # finds through the sweep's own readers. All are copied into the offline folder.
+  summary: {stage: 04_sweep, name: summary.json}
+  # Sample images. Chosen by experiments/08_select_samples.py from the stage 02
+  # records (the logit the classifier gave each image), never by hand:
+  samples:
+    # PlantDoc shift_eval images (the planners' own pool), CC BY 4.0: correctly
+    # classified diseased and healthy images at evenly spaced interior quantiles of
+    # confidence (4 per class: the 20th, 40th, 60th and 80th percentiles), plus the
+    # most confident mistakes, alternating missed disease and false alarm.
+    plantdoc_correct_diseased: 4
+    plantdoc_correct_healthy: 4
+    plantdoc_wrong: 2
+    # PlantVillage test images (lab imagery, for contrast), one per class at the
+    # median confidence of its correctly classified images. Its
+    # licence is CC BY-NC-SA 4.0, so these stay in the laptop's offline folder and
+    # are never pushed to the public store.
+    plantvillage_per_class: 1
+    seed: 0
+    file: demo_samples.json
+    licences:
+      plantdoc: >-
+        PlantDoc (Singh et al., 2020), CC BY 4.0,
+        https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle
+        nirmalsankalana/plantdoc-dataset. Images unchanged.
+      plantvillage: >-
+        PlantVillage (Hughes and Salathe, 2015), CC BY-NC-SA 4.0 as published on
+        Kaggle abdallahalidev/plantvillage-dataset. Images unchanged; shown on the
+        offline laptop demonstration only.
+  # The default evaluation seed of the Plan panel. Chosen by
+  # experiments/08_choose_demo_seed.py, never by hand: among the candidate seeds,
+  # the one whose single episode (cluster sigma and tau as configured) gives
+  # detections per joule closest to the sweep's IQM for Lawnmower, GreedyEntropy and
+  # PPO at T = 1 and T = 4, measured as the mean relative difference over those six
+  # cells. The script prints the table it chose from.
+  seed_candidates: 30
+  default_seed: 28
