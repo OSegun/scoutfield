@@ -1,17 +1,18 @@
 {
   "run_id": "r2026-11-13",
   "store": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts",
-  "store_revision": "67900dae5544905c7c06545064a67851140fcd34",
-  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/67900dae5544905c7c06545064a67851140fcd34/runs/r2026-11-13",
-  "promoted_at": "2026-11-13T17:38:53+00:00",
-  "promoted_by_commit": "c2f0b92fc4f787188d9f3434754502688ef315b4",
+  "store_revision": "699392734c937bcb827d99dff3244523fbf6d43d",
+  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/699392734c937bcb827d99dff3244523fbf6d43d/runs/r2026-11-13",
+  "promoted_at": "2026-11-14T13:10:16+00:00",
+  "promoted_by_commit": "1e0a35e42c70007c773d9053f546f83dae22ad52",
   "stage_commits": {
     "01_perception": "193ec3f779f0c3d37ed1c29ce5be160609853751",
     "02_calibration": "193ec3f779f0c3d37ed1c29ce5be160609853751",
     "03_ppo": "184c3c56c902cd58bf28911a2c61a919a18d58bd",
     "04_sweep": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
     "05_tau": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
-    "06_figures": "c2f0b92fc4f787188d9f3434754502688ef315b4"
+    "06_figures": "c2f0b92fc4f787188d9f3434754502688ef315b4",
+    "08_deployment": "1e0a35e42c70007c773d9053f546f83dae22ad52"
   },
   "files": [
     {
@@ -121,6 +122,18 @@
       "stage": "06_figures",
       "sha256": "d4eb9898f8214d207d417560c771b036a6d57ca3eff527a4aa88162610368f00",
       "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "results/deployment_latency.json",
+      "stage": "08_deployment",
+      "sha256": "48b9e41c2170defbf5422b288fa1044aac09e7da7bc15df13b35bb2b2661528b",
+      "store_commit": "20e9efd6592a2edb7f47624886ccc8c062d2bc89"
+    },
+    {
+      "path": "results/export_record.json",
+      "stage": "08_deployment",
+      "sha256": "98c24587eb618b03f64459d96d21fcdc2001cd210085f1d364cfc2c97dc4cd67",
+      "store_commit": "0608995f75b3bea6a9ea24c23c960bda5a250471"
     }
   ]
 }

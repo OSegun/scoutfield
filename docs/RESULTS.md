@@ -3,7 +3,7 @@
 **Run `r2026-11-13`.** Every number below is read from the files in `results/`, which
 are copies of that run's final outputs in the public artefact store.
 `results/RUN.json` names the store revision they were taken from
-(`67900dae5544905c7c06545064a67851140fcd34`) and lists each file with its SHA-256. If a
+(`699392734c937bcb827d99dff3244523fbf6d43d`) and lists each file with its SHA-256. If a
 number here disagrees with those files, this file is wrong.
 
 Rounding: detections per joule and calibration errors to 4 decimal places, rates
@@ -325,11 +325,29 @@ PlantDoc `shift_eval` under both temperatures.
 
 ## 8. Deployment
 
-Roadmap item 9. **Not measured in this release.** The ONNX export and its latency have
-not been measured from this run's trained checkpoint, so no deployment figure is
-reported. When they are, the hardware is recorded with every measurement, and median and
-p95 latency are reported rather than the mean: tail latency determines whether a flight
-controller misses its deadline, and the mean hides it.
+Roadmap item 9. Read from `results/export_record.json` and
+`results/deployment_latency.json`; the method is in `docs/METHOD.md`, section
+*"6. Deployment"*.
+
+**Export.** The run's `best.pt` was exported to a single ONNX file (opset 18). On 65
+seeded random inputs, ONNX Runtime and PyTorch gave identical predictions, and their
+logits differed by at most 1.96e-05, within the 1e-4 tolerance.
+
+**Latency.** Measured on a laptop, not on drone hardware: an 11th Gen Intel Core
+i7-1165G7 at 2.80 GHz (4 cores, 8 threads), 15.7 GB RAM, Windows 11, on mains power;
+ONNX Runtime 1.28.0 on the CPU, Python 3.13.2. One image per call (1 × 3 × 224 × 224),
+the model call only, without decoding or resizing the image. Each figure is the middle
+of three repeats of 500 timed calls after 50 warm-up calls; the range across the
+repeats is in brackets. Milliseconds to 1 decimal place.
+
+| Threads | Median (ms) | p95 (ms) | Images per second (at the median) |
+| --- | --- | --- | --- |
+| ONNX Runtime default | 8.8 [8.0, 8.8] | 10.2 [9.6, 10.7] | 114.1 |
+| 1 | 14.5 [14.5, 15.0] | 18.5 [18.2, 19.9] | 68.8 |
+
+Even on a single core, 95% of classifications finish within 20 ms, so on this machine
+the classifier would not hold up a scout that classifies a few images per second. An
+on-board computer is slower than this laptop, and its latency has not been measured.
 
 ---
 

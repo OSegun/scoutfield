@@ -19,8 +19,8 @@ pilot's effect was real or an artefact of the surrogate.
 
 > **Status: research in progress, not a finished study.** The pipeline is built and has run
 > end to end. **Results: run `r2026-11-13`, reported in [`docs/RESULTS.md`](docs/RESULTS.md).**
-> Uncertainty methods and deployment measurements are not yet run. Nothing here has been
-> peer-reviewed.
+> The classifier's ONNX latency is measured on a laptop; uncertainty methods are not yet
+> run. Nothing here has been peer-reviewed.
 >
 > The **completed** work is the pilot study: 195 executed runs and 8 figures, frozen in the
 > companion repository [**scoutplan**](https://github.com/OSegun/scoutplan)
@@ -55,7 +55,7 @@ and it needs no budget.
 | 6. τ sensitivity | implemented |
 | 7. MC-dropout, deep ensembles, reliability diagrams | **partial**: reliability diagrams drawn (Figure 9); MC-dropout and deep ensembles not run |
 | 8. Oracle planner; regret | implemented |
-| 9. ONNX export, latency, deployed interface | **partial**: export and latency harness; not measured from the trained checkpoint; no deployed interface |
+| 9. ONNX export, latency, deployed interface | **partial**: trained checkpoint exported and verified; latency measured on a laptop CPU; demonstration interface not yet updated |
 
 Results are in [`docs/RESULTS.md`](docs/RESULTS.md). Every number there is read from the
 files in `results/`, which are copies of one run's outputs; if the two disagree, the
@@ -89,7 +89,7 @@ predictions"*.
 **Checkpoints and every intermediate file** (classifier weights, logit pools, PPO
 policies, resume state and the run manifest) are in the public artefact store, pinned to
 the revision the results were taken from:
-[`runs/r2026-11-13`](https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/67900dae5544905c7c06545064a67851140fcd34/runs/r2026-11-13).
+[`runs/r2026-11-13`](https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/699392734c937bcb827d99dff3244523fbf6d43d/runs/r2026-11-13).
 `results/RUN.json` lists every file promoted into this repository with its SHA-256;
 `docs/REPRODUCING.md` shows how to download the run and check it.
 
@@ -123,10 +123,12 @@ Stated here rather than left for a reviewer to find.
 - **The τ sweep evaluates one PPO policy.** For cost, PPO's τ runs use the seed 0 policy
   at the median cluster scale only, so its τ curve has 5 runs per point against 15 for
   each baseline.
-- **Uncertainty methods and deployment are not run in this release.** MC-dropout and deep
-  ensembles are not compared, and no latency is reported for the trained checkpoint.
-- **Deployment numbers are machine-specific.** Latency is measured on stated hardware and
-  says nothing about the trained model's field behaviour.
+- **Uncertainty methods are not run in this release.** MC-dropout and deep ensembles are
+  not compared.
+- **Deployment numbers are machine-specific.** The exported classifier's latency is
+  measured on a laptop CPU, stated in `docs/RESULTS.md`, section *"8. Deployment"*; no
+  drone or embedded computer was measured, and latency says nothing about the model's
+  field behaviour.
 - **No drone flew.** The field is simulated throughout, as in the pilot.
 
 ---

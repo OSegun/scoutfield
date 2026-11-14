@@ -1,0 +1,47 @@
+{
+  "run_id": "r2026-11-13",
+  "exported_at": "2026-11-14T13:08:02+00:00",
+  "checkpoint": {
+    "source": "store runs/r2026-11-13/01_perception/best.pt",
+    "sha256": "03b3b6d2c018c72eb78b96babf1c7fbfdec7fc7eded28678c97a089a0421b5e5"
+  },
+  "onnx": {
+    "file": "classifier.onnx",
+    "sha256": "3afde6d9763ec14abf403badd465797ad07ea53f221efbf6fe5f1fe51318cf33",
+    "bytes": 16731923,
+    "opset": 18,
+    "input": {
+      "name": "image",
+      "shape": [
+        "batch",
+        3,
+        224,
+        224
+      ],
+      "dtype": "float32"
+    },
+    "output": {
+      "name": "logit",
+      "shape": [
+        "batch"
+      ],
+      "dtype": "float32",
+      "meaning": "raw logit of disease; no sigmoid, no temperature"
+    }
+  },
+  "verification": {
+    "max_abs_diff": 1.9550323486328125e-05,
+    "n_images": 65,
+    "atol": 0.0001,
+    "predictions_identical": true,
+    "verified_on": "seeded random input (seed 0), batch sizes 1 and 8"
+  },
+  "git_commit": "1e0a35e42c70007c773d9053f546f83dae22ad52",
+  "git_dirty": false,
+  "versions": {
+    "python": "3.13.2",
+    "torch": "2.13.0+cpu",
+    "onnx": "1.22.0",
+    "onnxruntime": "1.28.0"
+  }
+}

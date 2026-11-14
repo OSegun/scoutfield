@@ -1,0 +1,156 @@
+{
+  "run_id": "r2026-11-13",
+  "measured_at": "2026-11-14T13:09:47+00:00",
+  "what": "ONNX Runtime CPU inference of the exported classifier, model call only (no image decoding or resizing), on the laptop named under hardware; not drone hardware",
+  "onnx": {
+    "file": "classifier.onnx",
+    "sha256": "3afde6d9763ec14abf403badd465797ad07ea53f221efbf6fe5f1fe51318cf33",
+    "source": "local export .artifact_cache/deployment/r2026-11-13/classifier.onnx"
+  },
+  "settings": {
+    "execution_provider": "CPUExecutionProvider",
+    "batch_size": 1,
+    "warmup_runs": 50,
+    "timed_runs": 500,
+    "repeats": 3,
+    "input_shape": [
+      1,
+      3,
+      224,
+      224
+    ],
+    "intra_op_threads": [
+      0,
+      1
+    ]
+  },
+  "hardware": {
+    "cpu_model": "11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz",
+    "logical_cores": 8,
+    "physical_cores": 4,
+    "ram_gb": 15.7,
+    "os": "Windows-11-10.0.22621-SP0",
+    "machine": "AMD64",
+    "python": "3.13.2",
+    "onnxruntime": "1.28.0",
+    "providers": [
+      "CPUExecutionProvider"
+    ],
+    "on_mains_power": true,
+    "processor": "11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz",
+    "platform": "Windows-11-10.0.22621-SP0"
+  },
+  "measurements": [
+    {
+      "intra_op_threads": 0,
+      "median_ms": 8.764950000113458,
+      "median_ms_range": [
+        8.015999999770429,
+        8.798899999874266
+      ],
+      "p95_ms": 10.190065000278992,
+      "p95_ms_range": [
+        9.642410000060407,
+        10.685145000479675
+      ],
+      "throughput_images_per_s": 114.0907820337886,
+      "repeats": [
+        {
+          "median_ms": 8.798899999874266,
+          "p95_ms": 10.685145000479675,
+          "mean_ms": 8.572425799986377,
+          "min_ms": 5.327899999429064,
+          "max_ms": 16.734099999666796,
+          "n_runs": 500,
+          "warmup_runs": 50,
+          "batch_size": 1,
+          "intra_op_threads": 0,
+          "throughput_images_per_s": 113.65056995923239
+        },
+        {
+          "median_ms": 8.015999999770429,
+          "p95_ms": 9.642410000060407,
+          "mean_ms": 7.749291600011929,
+          "min_ms": 5.273400000078254,
+          "max_ms": 15.709499999502441,
+          "n_runs": 500,
+          "warmup_runs": 50,
+          "batch_size": 1,
+          "intra_op_threads": 0,
+          "throughput_images_per_s": 124.75049900556876
+        },
+        {
+          "median_ms": 8.764950000113458,
+          "p95_ms": 10.190065000278992,
+          "mean_ms": 8.5152018000299,
+          "min_ms": 5.510900000444963,
+          "max_ms": 53.83830000027956,
+          "n_runs": 500,
+          "warmup_runs": 50,
+          "batch_size": 1,
+          "intra_op_threads": 0,
+          "throughput_images_per_s": 114.0907820337886
+        }
+      ]
+    },
+    {
+      "intra_op_threads": 1,
+      "median_ms": 14.541000000008353,
+      "median_ms_range": [
+        14.45835000004081,
+        14.967199999773584
+      ],
+      "p95_ms": 18.519845000037094,
+      "p95_ms_range": [
+        18.194160000575717,
+        19.89171499976692
+      ],
+      "throughput_images_per_s": 68.77106113743385,
+      "repeats": [
+        {
+          "median_ms": 14.967199999773584,
+          "p95_ms": 19.89171499976692,
+          "mean_ms": 15.71217959999376,
+          "min_ms": 11.884200000167766,
+          "max_ms": 57.149300000673975,
+          "n_runs": 500,
+          "warmup_runs": 50,
+          "batch_size": 1,
+          "intra_op_threads": 1,
+          "throughput_images_per_s": 66.81276391142815
+        },
+        {
+          "median_ms": 14.541000000008353,
+          "p95_ms": 18.194160000575717,
+          "mean_ms": 15.046431000002485,
+          "min_ms": 12.41939999999886,
+          "max_ms": 30.986000000666536,
+          "n_runs": 500,
+          "warmup_runs": 50,
+          "batch_size": 1,
+          "intra_op_threads": 1,
+          "throughput_images_per_s": 68.77106113743385
+        },
+        {
+          "median_ms": 14.45835000004081,
+          "p95_ms": 18.519845000037094,
+          "mean_ms": 14.927768200008359,
+          "min_ms": 11.986599999545433,
+          "max_ms": 28.156500000477536,
+          "n_runs": 500,
+          "warmup_runs": 50,
+          "batch_size": 1,
+          "intra_op_threads": 1,
+          "throughput_images_per_s": 69.16418540132017
+        }
+      ]
+    }
+  ],
+  "git_commit": "1e0a35e42c70007c773d9053f546f83dae22ad52",
+  "git_dirty": false,
+  "versions": {
+    "python": "3.13.2",
+    "onnxruntime": "1.28.0",
+    "numpy": "2.5.1"
+  }
+}
