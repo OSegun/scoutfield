@@ -440,7 +440,34 @@ its interval whether or not its prediction held.
 
 ---
 
-## 6. Where results live
+## 6. Deployment
+
+`configs/deployment.yaml`
+
+The trained classifier is exported to ONNX so that it runs with ONNX Runtime alone,
+without PyTorch, as an on-board computer would run it. The export reads the run's
+`best.pt` from stage `01_perception` of the artefact store (or a local copy passed with
+`--checkpoint`) and writes into the gitignored artefact cache, never into the repository.
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Checkpoint | `01_perception/best.pt` | the epoch every reported number was computed from |
+| Opset | 18 | run by every onnxruntime the `app` extra allows (1.18 and later) |
+| Batch axis | dynamic | one image at a time on board; batches when replaying a pool |
+| Weights | inside the `.onnx` file | one file, so one SHA-256 covers the graph and the weights |
+| Equivalence inputs | 64 seeded random images, batch sizes 1 and 8 | the datasets are not on a laptop; random inputs exercise every operator numerically but say nothing about accuracy, which stage 02 measures on real images |
+| Logit tolerance | 1e-4 | the sigmoid's slope is at most 0.25, so 1e-4 in a logit moves a probability by at most 2.5e-5 at `T` = 1: far below one ECE bin (1/15) and below the fourth decimal place calibration is reported to |
+
+After every export, ONNX and PyTorch are run on the same inputs. The hard predictions
+must be identical and every logit must agree within the tolerance; otherwise the export
+fails. `export_record.json` travels with the file and records the checkpoint's SHA-256,
+the opset, the input and output shapes, the result of the check, the git commit and
+whether the working tree was clean. Exported in eval mode, the model has dropout
+switched off, so it serves point estimates only; MC-dropout cannot be run from it.
+
+---
+
+## 7. Where results live
 
 Every stage reads its inputs from, and writes its outputs to, one public Hugging Face
 dataset repository named in `configs/artifacts.yaml`, under `runs/<run_id>/<stage>/`. Each
@@ -452,7 +479,7 @@ The run's final CSV, JSON and figure files are also copied into `results/` and
 
 ---
 
-## 7. References
+## 8. References
 
 - Agarwal, R., Schwarzer, M., Castro, P. S., Courville, A., & Bellemare, M. G. (2021).
   Deep reinforcement learning at the edge of the statistical precipice. *NeurIPS 34*.

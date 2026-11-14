@@ -50,9 +50,18 @@ a resumed sweep treats two different runs as the same completed job and skips on
 | 4 | `while JOB_BUDGET=60 python experiments/04_sweep.py --config configs/sweep.yaml; do :; done` | ~81 min for 735 jobs, CPU | `sweep_results.csv`, `summary.json`, `sweep_metadata.json` (stage `04_sweep`) |
 | 5 | `python experiments/05_tau_sensitivity.py --config configs/sweep.yaml` | ~2.5 h for 2610 jobs, CPU | `tau_sensitivity.csv`, `tau_sensitivity_summary.json` (stage `05_tau`) |
 | 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 needs the uncertainty comparison and is not drawn |
+| 8 | `python experiments/08_export_onnx.py` | under a minute, CPU, laptop | `classifier.onnx`, `export_record.json` in `.artifact_cache/deployment/<run_id>/`; stage `08_deployment` only with `--push` |
 
 Runtimes are wall-clock times from run `r2026-11-13` on Kaggle: GPU T4 x2 for steps 0–3,
 CPU for steps 4–6. Steps 0 and 1 run in one notebook.
+
+Step 8 reads `best.pt` from stage `01_perception` of the store, exports it to ONNX, and
+runs ONNX and PyTorch on the same inputs: the hard predictions must match and the logits
+must agree within the tolerance in `configs/deployment.yaml`, or the script exits
+non-zero. `--checkpoint <path>` exports a local copy instead, with no network. The
+`.onnx` file is never written into the repository. `--push` files it in the store and is
+refused for a checkpoint the run did not record, or from a working tree with uncommitted
+changes.
 
 Run step 3 for every seed in `ppo_train_seeds` in `configs/sweep.yaml` (0, 1 and 2). A
 single seed is not evidence of convergence.
@@ -131,7 +140,8 @@ stage that produced it.
 | Regret against the oracle | computed from `summary.json` → `cells` as 1 − planner / oracle; Figure 15 | steps 4 and 6 |
 | Effect size against τ | `tau_sensitivity_summary.json`, `tau_sensitivity.csv` | step 5 |
 | Pre-registered predictions, held or not | judged from `summary.json` by the rules in `docs/METHOD.md`, section *"Pre-registered predictions"* | step 4 |
-| ONNX latency (median, p95) | not measured in this release | `python -m scoutfield.app.export_onnx --checkpoint ...` |
+| ONNX export check (max logit difference, predictions identical) | `export_record.json` → `verification` | step 8 |
+| ONNX latency (median, p95) | not measured in this release | step 8 |
 
 ---
 

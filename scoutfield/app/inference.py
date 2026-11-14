@@ -35,7 +35,7 @@ class ScoutPlanInference:
         if not self.onnx_path.exists():
             raise FileNotFoundError(
                 f"no exported model at {self.onnx_path}; run "
-                "python -m scoutfield.app.export_onnx --checkpoint <ckpt>"
+                "python experiments/08_export_onnx.py"
             )
         # CPU by default: the target is commodity hardware, and a GPU-only path
         # would not be the thing the latency numbers describe.

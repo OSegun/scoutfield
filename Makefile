@@ -1,5 +1,5 @@
 .PHONY: install install-dev test lint fmt clean \
-        train-perception calibrate train-ppo sweep tau figures app
+        train-perception calibrate train-ppo sweep tau figures export-onnx app
 
 PY ?= python
 
@@ -38,6 +38,9 @@ tau:                ## 5. tau sensitivity — unblocks quoting the effect size
 
 figures:            ## 6. rebuild every figure from results/summary.json
 	$(PY) experiments/make_figures.py
+
+export-onnx:        ## 8. export the trained classifier to ONNX and verify it (no push)
+	$(PY) experiments/08_export_onnx.py --config configs/deployment.yaml
 
 # -------------------------------------------------------------------- app
 app:

@@ -1,8 +1,9 @@
 ﻿"""
-ONNX export and latency measurement.
+ONNX export of the trained classifier, and its latency measurement.
 
-Run:
-    python -m scoutfield.app.export_onnx --checkpoint checkpoints/perception/best.pt
+Run (settings in ``configs/deployment.yaml``):
+    python experiments/08_export_onnx.py              # checkpoint from the store
+    python experiments/08_export_onnx.py --checkpoint <path/to/best.pt>
 
 Why ONNX
 --------
@@ -13,26 +14,28 @@ data-dependent control flow in the head.
 
 The export trap that matters here
 ----------------------------------
-``torch.onnx.export`` calls ``model.eval()``, which disables dropout. That is
-correct for the deployed classifier but it silently destroys MC-dropout. If the
-deployed app is meant to report epistemic uncertainty, dropout has to be exported
-as an explicit graph node, or the uncertainty estimate has to come from an
-exported ensemble instead. Decide which, and say which in the write-up — an app
-that silently reports zero epistemic uncertainty looks confident and is not.
+``torch.onnx.export`` exports the model in eval mode, which disables dropout. That
+is correct for the deployed classifier, and it means this export is the
+point-estimate path only: MC-dropout cannot be run from it. Epistemic uncertainty
+in a deployed app would have to come from an exported ensemble instead.
 
 Verify numerical equivalence after export
 ------------------------------------------
-Compare ONNX and PyTorch logits on the full test split, not on one batch. A
-mismatch of even 1e-3 in logit space shifts probabilities enough to move ECE,
-and calibration is the quantity this whole project measures.
+Every export is compared against the PyTorch model on the same inputs: the hard
+predictions must be identical and the logits must agree within the tolerance in
+``configs/deployment.yaml``. A failure raises; an export that shifts logits would
+shift the calibration this whole project measures.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
+import os
 import platform
+import subprocess
+import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -40,35 +43,107 @@ import numpy as np
 INPUT_NAME = "image"
 OUTPUT_NAME = "logit"
 
+DEFAULT_CONFIG = "configs/deployment.yaml"
 
-def export(checkpoint: str, out_path: str, opset: int = 18, config=None,
-           image_size: int = 224, verify_loader=None) -> dict:
+
+# ------------------------------------------------------------------ config
+
+def load_deployment_config(path: str | Path | None = None):
+    """``configs/deployment.yaml``, resolved against the repository root."""
+    from scoutfield.config import load_config
+    from scoutfield.utils.paths import repo_root
+
+    p = Path(path) if path else Path(DEFAULT_CONFIG)
+    if not p.is_absolute():
+        p = repo_root() / p
+    return load_config(p)
+
+
+def work_dir(config, run_id: str) -> Path:
+    """Where this machine's exported files for ``run_id`` live (gitignored)."""
+    from scoutfield.utils.paths import repo_root
+
+    base = Path(config["work_dir"])
+    if not base.is_absolute():
+        base = repo_root() / base
+    out = base / run_id
+    out.mkdir(parents=True, exist_ok=True)
+    return out
+
+
+def resolve_checkpoint(config, store=None, override: str | Path | None = None
+                       ) -> tuple[Path, str]:
+    """The checkpoint to export, and a description of where it came from.
+
+    By default the run's checkpoint is pulled from the artefact store, which also
+    checks its SHA-256 against the run's manifest. ``override`` is for working
+    offline with a local copy; a missing file raises rather than falling back.
+    """
+    export_cfg = config.section("export")
+    if override is not None:
+        path = Path(override)
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"no checkpoint at {path}. Pass the path of a local best.pt, or omit "
+                f"--checkpoint to pull it from the artefact store."
+            )
+        return path, f"local file {path}"
+
+    from scoutfield.utils.artifacts import get_store
+
+    store = store or get_store()
+    stage, name = export_cfg["checkpoint_stage"], export_cfg["checkpoint_file"]
+    path = store.pull(stage, name)
+    return path, f"store {store.remote_path(stage, name)}"
+
+
+# ------------------------------------------------------------------ export
+
+def _model_from_checkpoint(checkpoint, perception_config):
+    """The trained network, with no ImageNet weights downloaded first.
+
+    The checkpoint replaces every weight, so building the backbone with its
+    pretrained weights would only add a network download to an offline step.
+    """
+    from scoutfield.perception.calibrate import _load_model_state
+    from scoutfield.perception.model import BinaryClassifier
+
+    model_cfg = perception_config.section("model")
+    model = BinaryClassifier(
+        backbone=model_cfg.get("backbone", "efficientnet_b0"),
+        pretrained=False,
+        head_dropout=float(model_cfg.get("head_dropout", 0.3)),
+    )
+    model.load_state_dict(_load_model_state(checkpoint))
+    model.eval()
+    return model
+
+
+def export(checkpoint: str | Path, out_path: str | Path, opset: int | None = None,
+           config=None, verify: dict | None = None) -> dict:
     """Export to ONNX with a dynamic batch axis, then verify equivalence.
 
-    ``torch.onnx.export`` puts the model in eval mode, which disables dropout.
-    That is correct for the deployed *classifier* and fatal for MC-dropout: this
-    export is the point-estimate path only. Epistemic uncertainty in the deployed
-    app has to come from an exported ensemble instead, and the write-up says so
-    rather than shipping an app that silently reports zero epistemic uncertainty.
+    ``config`` is the perception config (``configs/perception.yaml`` by default),
+    which fixes the architecture and the image size. ``opset`` and ``verify``
+    default to ``configs/deployment.yaml``.
     """
     import torch
 
     from scoutfield.config import load_config
-    from scoutfield.perception.calibrate import _load_model_state
-    from scoutfield.perception.model import build_model
     from scoutfield.utils.paths import repo_root
 
     if config is None:
         config = load_config(repo_root() / "configs" / "perception.yaml")
-    image_size = int(config.section("data").get("image_size", image_size))
+    deployment = load_deployment_config().section("export")
+    opset = int(deployment["opset"] if opset is None else opset)
+    verify = dict(deployment["verify"] if verify is None else verify)
+    image_size = int(config.section("data")["image_size"])
 
-    model = build_model(config)
-    model.load_state_dict(_load_model_state(checkpoint))
-    model.eval()
+    model = _model_from_checkpoint(checkpoint, config)
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    dummy = torch.randn(1, 3, image_size, image_size)
+    dummy = torch.zeros(1, 3, image_size, image_size)
 
     torch.onnx.export(
         model, dummy, str(out_path),
@@ -77,69 +152,225 @@ def export(checkpoint: str, out_path: str, opset: int = 18, config=None,
         # under the dynamo exporter. Keyed by the forward argument name.
         dynamic_shapes={"x": {0: torch.export.Dim.AUTO}},
         opset_version=opset,
+        # One self-contained file. By default the exporter moves the weights into a
+        # side file (`<name>.onnx.data`), so the SHA-256 of the .onnx alone would not
+        # cover them and a copy of one file without the other would fail to load.
+        external_data=False,
         # Silenced deliberately: the exporter's progress output contains emoji,
         # which raises UnicodeEncodeError on a Windows cp1252 console and takes
         # the whole export down with it after it has already succeeded.
         verbose=False,
     )
 
-    report = verify_equivalence(model, out_path, verify_loader, image_size)
+    report = verify_equivalence(
+        model, out_path, image_size=image_size,
+        n_inputs=int(verify["n_inputs"]), batch_size=int(verify["batch_size"]),
+        seed=int(verify["seed"]), atol=float(verify["logit_atol"]),
+    )
     report["path"] = str(out_path)
     report["opset"] = opset
+    report["image_size"] = image_size
     # ASCII only: a Windows cp1252 console cannot encode most of what this
     # sentence wants to say, and a crash in a log line would discard the export.
-    print(f"exported {out_path} (max abs logit diff = {report['max_abs_diff']:.2e})")
+    print(f"exported {out_path} (max abs logit diff = {report['max_abs_diff']:.2e} "
+          f"over {report['n_images']} inputs; predictions identical)")
     return report
 
 
-def verify_equivalence(model, onnx_path, loader=None, image_size: int = 224,
-                       atol: float = 1e-4) -> dict:
-    """Compare ONNX and PyTorch logits over the test split, not one batch.
+def verify_equivalence(model, onnx_path, image_size: int, n_inputs: int,
+                       batch_size: int, seed: int, atol: float) -> dict:
+    """Compare ONNX and PyTorch on the same seeded inputs. Fatal on any mismatch.
 
-    A mismatch of even 1e-3 in logit space shifts probabilities enough to move
-    ECE, and calibration is the quantity this project measures — so the check is
-    on logits, and it is fatal rather than advisory.
+    Two checks: the hard predictions (the sign of the logit) must be identical,
+    and the logits must agree within ``atol``. The first batch is also run at
+    batch size 1, so both a single image and a batch pass through the dynamic
+    batch axis.
     """
     import onnxruntime as ort
     import torch
 
     session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+    rng = np.random.default_rng(seed)
+    inputs = rng.standard_normal((n_inputs, 3, image_size, image_size)).astype(np.float32)
+    batches = [inputs[:1]] + [inputs[i:i + batch_size]
+                              for i in range(0, n_inputs, batch_size)]
 
-    batches = []
-    if loader is not None:
-        for x, _, _ in loader:
-            batches.append(x)
-    else:
-        # No data available (the usual case on a laptop with no dataset mounted).
-        # Random input still exercises the whole graph numerically; it just cannot
-        # speak to accuracy, and the report says which was used.
-        batches = [torch.randn(8, 3, image_size, image_size) for _ in range(4)]
-
-    max_diff, n = 0.0, 0
+    torch_all, onnx_all = [], []
     with torch.no_grad():
         for x in batches:
-            torch_logits = model(x).cpu().numpy().ravel()
-            onnx_logits = session.run(
-                [OUTPUT_NAME], {INPUT_NAME: x.cpu().numpy()}
-            )[0].ravel()
-            max_diff = max(max_diff, float(np.max(np.abs(torch_logits - onnx_logits))))
-            n += len(torch_logits)
+            torch_all.append(model(torch.from_numpy(x)).cpu().numpy().ravel())
+            onnx_all.append(session.run([OUTPUT_NAME], {INPUT_NAME: x})[0].ravel())
+    torch_logits = np.concatenate(torch_all)
+    onnx_logits = np.concatenate(onnx_all)
 
-    if max_diff > atol:
+    max_diff = float(np.max(np.abs(torch_logits - onnx_logits)))
+    disagree = int(np.sum((torch_logits > 0) != (onnx_logits > 0)))
+    if disagree or max_diff > atol:
         raise AssertionError(
-            f"ONNX and PyTorch logits differ by {max_diff:.3e} > {atol:.0e} over {n} "
-            "images. That is enough to move ECE, so the export is not usable for a "
-            "calibration result."
+            f"ONNX and PyTorch disagree over {torch_logits.size} inputs: "
+            f"{disagree} hard prediction(s) differ, max |logit diff| = {max_diff:.3e} "
+            f"(tolerance {atol:.0e}, configs/deployment.yaml export.verify.logit_atol). "
+            "The export would change the calibration being measured, so it is rejected."
         )
-    return {"max_abs_diff": max_diff, "n_images": n, "atol": atol,
-            "verified_on": "test split" if loader is not None else "random input"}
+    return {
+        "max_abs_diff": max_diff,
+        "n_images": int(torch_logits.size),
+        "predictions_identical": True,
+        "atol": atol,
+        "verified_on": f"seeded random input (seed {seed}), batch sizes 1 and {batch_size}",
+    }
 
 
-def measure_latency(onnx_path: str, n_runs: int = 200, warmup: int = 20,
-                    image_size: int = 224, batch_size: int = 1) -> dict:
-    """Measure per-image inference latency on this machine.
+def git_state() -> dict:
+    """The commit running, and whether the working tree had uncommitted changes.
 
-    Median and p95, not the mean: tail latency determines whether a flight
+    An export from uncommitted code would otherwise be attributed to a commit that
+    did not produce it.
+    """
+    from scoutfield.utils.artifacts import git_commit
+    from scoutfield.utils.paths import repo_root
+
+    commit = git_commit()
+    try:
+        out = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"],
+                             cwd=repo_root(), capture_output=True, text=True, timeout=10,
+                             check=False)
+        dirty = bool(out.stdout.strip()) if out.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        dirty = None
+    return {"git_commit": commit, "git_dirty": dirty}
+
+
+def export_record(report: dict, onnx_path: Path, checkpoint: Path, source: str,
+                  run_id: str) -> dict:
+    """What a reader needs to trust the exported file: its inputs and its checks."""
+    import onnx
+    import onnxruntime as ort
+    import torch
+
+    from scoutfield.utils.artifacts import sha256_of
+
+    size = int(report["image_size"])
+    return {
+        "run_id": run_id,
+        "exported_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "checkpoint": {"source": source, "sha256": sha256_of(checkpoint)},
+        "onnx": {
+            "file": onnx_path.name,
+            "sha256": sha256_of(onnx_path),
+            "bytes": onnx_path.stat().st_size,
+            "opset": int(report["opset"]),
+            "input": {"name": INPUT_NAME, "shape": ["batch", 3, size, size],
+                      "dtype": "float32"},
+            "output": {"name": OUTPUT_NAME, "shape": ["batch"], "dtype": "float32",
+                       "meaning": "raw logit of disease; no sigmoid, no temperature"},
+        },
+        "verification": {k: report[k] for k in ("max_abs_diff", "n_images", "atol",
+                                                "predictions_identical", "verified_on")},
+        **git_state(),
+        "versions": {"python": platform.python_version(), "torch": torch.__version__,
+                     "onnx": onnx.__version__, "onnxruntime": ort.__version__},
+    }
+
+
+# ----------------------------------------------------------------- latency
+
+def hardware_info() -> dict:
+    """The machine a measurement was taken on, read from the system, not typed.
+
+    CPU model name, logical and physical core counts, installed RAM and the
+    operating system. Standard library only: the brand string comes from the
+    Windows registry, ``/proc/cpuinfo`` on Linux and ``sysctl`` on macOS.
+    """
+    return {
+        "cpu_model": _cpu_model(),
+        "logical_cores": os.cpu_count(),
+        "physical_cores": _physical_cores(),
+        "ram_gb": _ram_gb(),
+        "os": platform.platform(),
+        "machine": platform.machine(),
+        "python": platform.python_version(),
+    }
+
+
+def _cpu_model() -> str:
+    if sys.platform == "win32":
+        import winreg
+
+        try:
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                                 r"HARDWARE\DESCRIPTION\System\CentralProcessor\0")
+            return str(winreg.QueryValueEx(key, "ProcessorNameString")[0]).strip()
+        except OSError:
+            pass
+    elif sys.platform.startswith("linux"):
+        try:
+            for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
+                if line.lower().startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+        except OSError:
+            pass
+    elif sys.platform == "darwin":
+        out = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"],
+                             capture_output=True, text=True, check=False)
+        if out.stdout.strip():
+            return out.stdout.strip()
+    return platform.processor() or platform.machine() or "unknown"
+
+
+def _physical_cores() -> int | None:
+    if sys.platform == "win32":
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "(Get-CimInstance Win32_Processor | Measure-Object NumberOfCores -Sum).Sum"],
+            capture_output=True, text=True, check=False, timeout=30)
+        return int(out.stdout.strip()) if out.stdout.strip().isdigit() else None
+    if sys.platform.startswith("linux"):
+        try:
+            pairs = set()
+            physical = core = None
+            for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
+                if line.startswith("physical id"):
+                    physical = line.split(":", 1)[1].strip()
+                elif line.startswith("core id"):
+                    core = line.split(":", 1)[1].strip()
+                    pairs.add((physical, core))
+            return len(pairs) or None
+        except OSError:
+            return None
+    return None
+
+
+def _ram_gb() -> float | None:
+    if sys.platform == "win32":
+        import ctypes
+
+        class _MemoryStatus(ctypes.Structure):
+            _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                        ("ullTotalPhys", ctypes.c_ulonglong),
+                        ("ullAvailPhys", ctypes.c_ulonglong),
+                        ("ullTotalPageFile", ctypes.c_ulonglong),
+                        ("ullAvailPageFile", ctypes.c_ulonglong),
+                        ("ullTotalVirtual", ctypes.c_ulonglong),
+                        ("ullAvailVirtual", ctypes.c_ulonglong),
+                        ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+
+        status = _MemoryStatus()
+        status.dwLength = ctypes.sizeof(_MemoryStatus)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+            return round(status.ullTotalPhys / 2**30, 1)
+        return None
+    try:
+        return round(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30, 1)
+    except (ValueError, OSError, AttributeError):
+        return None
+
+
+def measure_latency(onnx_path: str | Path, n_runs: int = 200, warmup: int = 20,
+                    image_size: int = 224, batch_size: int = 1, seed: int = 0) -> dict:
+    """Measure per-call inference latency on this machine.
+
+    Median and p95, not the mean alone: tail latency determines whether a flight
     controller misses its deadline, and the mean hides it. The hardware is
     recorded alongside — a latency figure without the machine it was measured on
     is not reproducible and does not belong in a report.
@@ -147,7 +378,8 @@ def measure_latency(onnx_path: str, n_runs: int = 200, warmup: int = 20,
     import onnxruntime as ort
 
     session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
-    x = np.random.randn(batch_size, 3, image_size, image_size).astype(np.float32)
+    x = np.random.default_rng(seed).standard_normal(
+        (batch_size, 3, image_size, image_size)).astype(np.float32)
 
     for _ in range(warmup):
         session.run([OUTPUT_NAME], {INPUT_NAME: x})
@@ -159,47 +391,70 @@ def measure_latency(onnx_path: str, n_runs: int = 200, warmup: int = 20,
         timings.append((time.perf_counter() - t0) * 1000.0)
 
     timings_ms = np.asarray(timings)
+    hardware = hardware_info()
+    hardware.update({
+        "onnxruntime": ort.__version__,
+        "providers": session.get_providers(),
+        # Kept for compatibility with earlier readers of this dict.
+        "processor": hardware["cpu_model"],
+        "platform": hardware["os"],
+    })
     return {
         "median_ms": float(np.median(timings_ms)),
         "p95_ms": float(np.percentile(timings_ms, 95)),
         "mean_ms": float(timings_ms.mean()),
-        "n_runs": n_runs,
-        "batch_size": batch_size,
+        "min_ms": float(timings_ms.min()),
+        "max_ms": float(timings_ms.max()),
+        "n_runs": int(n_runs),
+        "warmup_runs": int(warmup),
+        "batch_size": int(batch_size),
         "throughput_images_per_s": float(batch_size * 1000.0 / np.median(timings_ms)),
-        "hardware": {
-            "processor": platform.processor() or platform.machine(),
-            "platform": platform.platform(),
-            "python": platform.python_version(),
-            "onnxruntime": ort.__version__,
-            "providers": session.get_providers(),
-            "intra_op_threads": ort.SessionOptions().intra_op_num_threads,
-        },
+        "hardware": hardware,
     }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", required=True)
-    parser.add_argument("--out", default="checkpoints/perception/model.onnx")
-    parser.add_argument("--config", default="configs/perception.yaml")
-    parser.add_argument("--skip-latency", action="store_true")
-    args = parser.parse_args()
+# ------------------------------------------------------------------- driver
 
-    from scoutfield.config import load_config
-    from scoutfield.utils.paths import results_dir
+def run_export(config_path: str | Path | None = None, checkpoint: str | Path | None = None,
+               push: bool = False, store=None) -> dict:
+    """Export the run's classifier into the local work directory; optionally push.
 
-    report = export(args.checkpoint, args.out, config=load_config(args.config))
-    if not args.skip_latency:
-        report["latency"] = measure_latency(args.out)
-        lat = report["latency"]
-        print(f"latency: median {lat['median_ms']:.1f} ms, p95 {lat['p95_ms']:.1f} ms "
-              f"on {lat['hardware']['processor']}")
+    Pushing writes ``classifier.onnx`` and the export record to stage
+    ``08_deployment`` of the store. It is refused unless the exported checkpoint
+    is byte-identical to the one the run recorded, so a pushed model always traces
+    to the run it is filed under.
+    """
+    from scoutfield.utils.artifacts import get_store, sha256_of
 
-    out = results_dir() / "export_report.json"
-    with out.open("w", encoding="utf-8") as fh:
-        json.dump(report, fh, indent=2)
-    print(f"wrote {out}")
+    config = load_deployment_config(config_path)
+    export_cfg = config.section("export")
+    store = store or get_store()
+    ckpt, source = resolve_checkpoint(config, store=store, override=checkpoint)
 
+    out_dir = work_dir(config, store.run_id)
+    onnx_path = out_dir / export_cfg["classifier_file"]
+    report = export(ckpt, onnx_path)
+    record = export_record(report, onnx_path, Path(ckpt), source, store.run_id)
+    record_path = out_dir / export_cfg["record_file"]
+    with record_path.open("w", encoding="utf-8") as fh:
+        json.dump(record, fh, indent=2)
+    print(f"wrote {record_path}")
 
-if __name__ == "__main__":
-    main()
+    if push:
+        stage = str(config["stage"])
+        recorded = store.stage_entry(export_cfg["checkpoint_stage"]).get("files", {}) \
+            .get(export_cfg["checkpoint_file"], {}).get("sha256")
+        if recorded != sha256_of(ckpt):
+            raise ValueError(
+                f"refusing to push: the exported checkpoint ({source}) is not the "
+                f"{export_cfg['checkpoint_file']} recorded for run {store.run_id}."
+            )
+        if record["git_dirty"]:
+            raise ValueError("refusing to push an export made from uncommitted code; "
+                             "commit first so the record names the code that made it.")
+        store.push(stage, [onnx_path, record_path], "classifier exported to ONNX")
+        store.record_inputs(stage, [(export_cfg["checkpoint_stage"],
+                                     export_cfg["checkpoint_file"])])
+        print(f"pushed {onnx_path.name} and {record_path.name} to {stage} "
+              f"of run {store.run_id}")
+    return record

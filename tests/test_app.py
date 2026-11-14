@@ -37,7 +37,7 @@ def exported(tmp_path_factory):
 
     onnx_path = tmp / "model.onnx"
     report = export(str(checkpoint), str(onnx_path), config=cfg)
-    return {"onnx": onnx_path, "report": report, "config": cfg}
+    return {"onnx": onnx_path, "report": report, "config": cfg, "checkpoint": checkpoint}
 
 
 def test_export_preserves_logits(exported):
@@ -95,6 +95,67 @@ def test_inference_fails_loudly_without_an_exported_model(tmp_path):
 
     with pytest.raises(FileNotFoundError, match="export_onnx"):
         ScoutPlanInference(tmp_path / "absent.onnx")
+
+
+def test_export_rejects_a_graph_that_differs_from_the_model(exported, tmp_path):
+    """The equivalence check must fail loudly, not report a difference and carry on."""
+    from scoutfield.app.export_onnx import _model_from_checkpoint, verify_equivalence
+    from scoutfield.perception.model import build_model
+    from scoutfield.utils.checkpoint import save_training_state
+
+    other = build_model(exported["config"])
+    with torch.no_grad():
+        other.backbone.classifier[1].bias.add_(5.0)
+    changed = tmp_path / "changed.pt"
+    save_training_state(changed, {"model": other.state_dict(), "epoch": -1})
+    model = _model_from_checkpoint(changed, exported["config"])
+
+    with pytest.raises(AssertionError, match="disagree"):
+        verify_equivalence(model, exported["onnx"], image_size=224, n_inputs=4,
+                           batch_size=2, seed=0, atol=1e-4)
+
+
+def test_export_record_names_its_inputs(exported):
+    """Opset, input shape, checkpoint SHA-256 and commit travel with the file."""
+    from pathlib import Path
+
+    from scoutfield.app.export_onnx import export_record
+
+    report = exported["report"]
+    record = export_record(report, Path(report["path"]), exported["checkpoint"],
+                           "local file", "rtest")
+    assert record["onnx"]["opset"] == report["opset"]
+    assert record["onnx"]["input"]["shape"] == ["batch", 3, 224, 224]
+    assert len(record["checkpoint"]["sha256"]) == 64
+    assert "git_commit" in record and "git_dirty" in record
+    assert record["verification"]["predictions_identical"] is True
+
+
+def test_a_missing_local_checkpoint_raises_and_names_it(tmp_path):
+    from scoutfield.app.export_onnx import load_deployment_config, resolve_checkpoint
+
+    with pytest.raises(FileNotFoundError, match="absent.pt"):
+        resolve_checkpoint(load_deployment_config(), override=tmp_path / "absent.pt")
+
+
+def test_push_is_refused_for_a_checkpoint_the_run_did_not_record(exported, store,
+                                                                monkeypatch, tmp_path):
+    """A pushed model must trace to the checkpoint filed under the same run."""
+    from scoutfield.app import export_onnx
+
+    store.push("01_perception", [exported["checkpoint"]], "a different checkpoint",
+               names={str(exported["checkpoint"]): "best.pt"})
+    other = tmp_path / "other.pt"
+    other.write_bytes(exported["checkpoint"].read_bytes() + b"\0")
+    monkeypatch.setattr(export_onnx, "work_dir", lambda cfg, run: tmp_path / run)
+    monkeypatch.setattr(export_onnx, "export", lambda ckpt, out: {
+        **exported["report"], "path": str(exported["onnx"])})
+    (tmp_path / store.run_id).mkdir()
+    (tmp_path / store.run_id / "classifier.onnx").write_bytes(exported["onnx"].read_bytes())
+
+    with pytest.raises(ValueError, match="refusing to push"):
+        export_onnx.run_export(checkpoint=other, push=True, store=store)
+    assert not store.has("08_deployment", "classifier.onnx")
 
 
 def test_latency_reports_the_hardware_it_was_measured_on(exported):

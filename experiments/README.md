@@ -20,6 +20,7 @@ Inputs and outputs are files in the artefact store (`configs/artifacts.yaml`), b
 | `04_sweep.py` | 8 | `02_calibration`, `03_ppo` | `sweep_results.csv`, `summary.json`, `sweep_metadata.json` (`04_sweep`) |
 | `05_tau_sensitivity.py` | 6 | `02_calibration` | `tau_sensitivity.csv`, `tau_sensitivity_summary.json` (`05_tau`) |
 | `make_figures.py` | — | stages 02–05 | Figures 9–15 (`06_figures`) |
+| `08_export_onnx.py` | 9 | `01_perception/best.pt` | `classifier.onnx`, `export_record.json` (local; `08_deployment` with `--push`) |
 
 ## Order
 

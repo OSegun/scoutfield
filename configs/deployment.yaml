@@ -1,0 +1,43 @@
+# Deployment: the trained classifier exported to ONNX, and its measured latency.
+#
+# Every value here is read by scoutfield/app/export_onnx.py and described in
+# docs/METHOD.md, section "Deployment".
+
+# The artefact-store stage the exported files are pushed to. Pushing is a separate,
+# explicit step (`--push`); an export alone never writes to the store.
+stage: 08_deployment
+
+# Exported files are written here on this machine, inside the gitignored artefact
+# cache and under the run_id from configs/artifacts.yaml, so a model exported from
+# one run's checkpoint can never be mistaken for another run's. Never the
+# repository: a .onnx file is a large binary and belongs in the store.
+work_dir: .artifact_cache/deployment
+
+export:
+  # The checkpoint exported: stage 01_perception of the current run. `best.pt` is
+  # the epoch every reported number was computed from; `last.pt` is resume state.
+  checkpoint_stage: 01_perception
+  checkpoint_file: best.pt
+  # ONNX operator-set version. 18 was already the default of the export code before
+  # this file existed, and every onnxruntime the `app` extra in pyproject.toml
+  # allows (1.18 and later) runs it.
+  opset: 18
+  classifier_file: classifier.onnx
+  record_file: export_record.json
+
+  verify:
+    # ONNX and PyTorch are compared on the same inputs after every export. The
+    # datasets are not on a laptop, so the inputs are seeded random images: they
+    # exercise every operator of the graph numerically, though they say nothing
+    # about accuracy (accuracy is measured in stage 02 from real images). The
+    # record states which inputs were used.
+    n_inputs: 64
+    batch_size: 8
+    seed: 0
+    # Largest |ONNX logit - PyTorch logit| accepted. The demo and the sweep act on
+    # sigmoid(logit / T); the sigmoid's slope is at most 0.25, so a logit
+    # difference of 1e-4 moves a probability by at most 2.5e-5 at T = 1, and less
+    # at every T > 1. That is far below one ECE bin (1/15, configs/perception.yaml)
+    # and below the fourth decimal place every calibration figure is reported to.
+    # A larger difference fails the export.
+    logit_atol: 1.0e-4
