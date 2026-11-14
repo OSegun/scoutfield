@@ -1,5 +1,5 @@
 """
-ScoutPlan: the deployable artefact. Roadmap item 9.
+The deployable part of ScoutField. Roadmap item 9.
 
 Roadmap items 1-8 answer a research question. This turns the answer into
 something a person can run: export the classifier to ONNX, measure real inference

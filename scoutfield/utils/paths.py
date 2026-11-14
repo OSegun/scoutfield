@@ -8,8 +8,12 @@ training script.
 
     environment   input data                       writable output
     ------------  -------------------------------  ---------------------------
-    local         ./data/                          ./results, ./checkpoints
+    local         ./data/                          <local_work_dir>/results, ...
     Kaggle        /kaggle/input/<dataset-slug>/    /kaggle/working/
+
+``local_work_dir`` is set in ``configs/artifacts.yaml``. Locally, stages never write
+into the repository's own ``results/`` and ``figures/``: those hold the promoted
+outputs of one run and only the promotion step writes them.
     CI            tests use fixtures, no data       tmp_path
 
 Files that cross from one stage to another never travel through these paths: they
@@ -59,13 +63,26 @@ def data_dir(dataset_slug: str | None = None) -> Path:
     return next((c for c in candidates if c.exists()), candidates[0])
 
 
+def local_work_root() -> Path:
+    """``local_work_dir`` from ``configs/artifacts.yaml``, resolved against the repo."""
+    from scoutfield.config import load_config
+
+    settings = load_config(repo_root() / "configs" / "artifacts.yaml")
+    if "local_work_dir" not in settings.data:
+        raise KeyError("configs/artifacts.yaml has no local_work_dir; local stage runs "
+                       "need it so they never write into the promoted results/")
+    root = Path(settings["local_work_dir"])
+    return root if root.is_absolute() else repo_root() / root
+
+
 def output_dir(*parts: str) -> Path:
     """Writable output directory, created if missing.
 
     On Kaggle only ``/kaggle/working`` survives to the notebook's output; writing
-    anywhere else means the artefact is lost when the session ends.
+    anywhere else means the artefact is lost when the session ends. Locally the
+    base is ``local_work_dir`` from ``configs/artifacts.yaml``.
     """
-    base = Path("/kaggle/working") if is_kaggle() else repo_root()
+    base = Path("/kaggle/working") if is_kaggle() else local_work_root()
     out = base.joinpath(*parts)
     out.mkdir(parents=True, exist_ok=True)
     return out

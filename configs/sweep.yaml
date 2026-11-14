@@ -84,8 +84,12 @@ statistics:
 # to the artefact store together (every `push_every_jobs` in configs/artifacts.yaml
 # and at the end of each invocation) and pulled back on start, so a new session
 # resumes exactly where the store says the run is. To start over, use a new run_id.
+#
+# File names inside the results working directory (scoutfield.utils.paths.results_dir:
+# /kaggle/working/results on Kaggle, local_work_dir/results on a laptop), never the
+# repository's promoted results/.
 runner:
-  checkpoint_file: results/_done.json
-  output_csv: results/sweep_results.csv
-  summary_json: results/summary.json
+  checkpoint_file: _done.json
+  output_csv: sweep_results.csv
+  summary_json: summary.json
   job_budget: 60          # jobs per process invocation; keeps Kaggle sessions short

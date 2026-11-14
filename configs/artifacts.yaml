@@ -7,5 +7,10 @@ repo_type: dataset
 # never reuse one.
 run_id: r2026-11-13 # Set the real date when Part D starts
 local_cache: .artifact_cache # gitignored
+# Where a stage run on a laptop writes its working files (results/ and figures/
+# beneath it), gitignored. The repository's own results/ and figures/ hold one
+# promoted run and are written by the promotion step only, so a local run of stages
+# 04 to 06 can never overwrite them. On Kaggle stages write to /kaggle/working.
+local_work_dir: .artifact_cache/work
 # Resumable state is pushed this often so a killed Kaggle session loses at most this much.
 push_every_jobs: 25

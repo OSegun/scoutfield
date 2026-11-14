@@ -35,3 +35,12 @@ def test_data_dir_finds_a_kagglehub_download(tmp_path, monkeypatch):
 def test_data_dir_names_the_canonical_location_when_absent(tmp_path, monkeypatch):
     _rooted(monkeypatch, tmp_path)
     assert paths.data_dir("owner/missing") == tmp_path / "data" / "missing"
+
+
+def test_local_stage_outputs_never_land_in_the_promoted_results(monkeypatch):
+    """A laptop run of a stage writes to the gitignored work folder, not results/."""
+    monkeypatch.setattr(paths, "is_kaggle", lambda: False)
+    root = paths.repo_root()
+    assert paths.results_dir() != root / "results"
+    assert paths.figures_dir() != root / "figures"
+    assert paths.results_dir().is_relative_to(paths.local_work_root())

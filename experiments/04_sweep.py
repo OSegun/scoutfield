@@ -368,8 +368,8 @@ def main() -> None:
     store = get_store()
 
     budget = args.job_budget or int(os.environ.get("JOB_BUDGET", runner["job_budget"]))
-    registry_path = Path(runner["checkpoint_file"])
-    csv_path = Path(runner["output_csv"])
+    registry_path = results_dir() / runner["checkpoint_file"]
+    csv_path = results_dir() / runner["output_csv"]
     meta_path = results_dir() / "sweep_metadata.json"
     sync_resume_state(store, STAGE, registry_path, csv_path)
     registry = DoneRegistry(registry_path)
@@ -416,7 +416,7 @@ def main() -> None:
     from scoutfield.analysis.environment import field_statistics
     from scoutfield.analysis.summary import write_summary
 
-    summary_path = Path(runner["summary_json"])
+    summary_path = results_dir() / runner["summary_json"]
     summary = write_summary(csv_path, summary_path, cfg)
     env_cfg = load_config("configs/ppo_field32.yaml").section("env")
     summary["environment"] = field_statistics(env_cfg, cfg["cluster_sigmas"],
