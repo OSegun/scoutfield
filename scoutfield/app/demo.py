@@ -384,9 +384,16 @@ def select_samples(pool_path: Path, n_correct_diseased: int, n_correct_healthy: 
 
 
 def find_image(dataset_root: Path, key: str) -> Path:
-    """The file for an item key (its last three path components) under a dataset."""
+    """The file for an item key (its last three path components) under a dataset.
+
+    The file name is also looked for URL-encoded (spaces as ``%20``), which is how
+    the Kaggle command-line tool saves a single file downloaded with ``-f``.
+    """
+    from urllib.parse import quote
+
     parts = Path(key).parts
-    for candidate in Path(dataset_root).rglob(parts[-1]):
-        if candidate.parts[-3:] == parts[-3:]:
-            return candidate
+    for name in dict.fromkeys((parts[-1], quote(parts[-1]))):
+        for candidate in Path(dataset_root).rglob(name):
+            if candidate.parts[-3:-1] == parts[-3:-1]:
+                return candidate
     raise FileNotFoundError(f"{key} not found under {dataset_root}")

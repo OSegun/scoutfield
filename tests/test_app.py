@@ -536,3 +536,16 @@ def test_samples_are_chosen_by_rule_from_the_pool(tmp_path):
     # false alarm (+5.0).
     assert sorted(p["logit"] for p in wrong) == [-4.0, 5.0]
     assert picks == demo.select_samples(pool, 2, 2, 2)  # deterministic
+
+
+def test_find_image_accepts_a_kaggle_single_file_download(tmp_path):
+    """``kaggle datasets download -f`` saves spaces in a name as %20."""
+    from scoutfield.app import demo
+
+    folder = tmp_path / "train" / "Apple_leaf"
+    folder.mkdir(parents=True)
+    saved = folder / "train_Apple%20leaf_57.jpg"
+    saved.write_bytes(b"jpeg")
+    assert demo.find_image(tmp_path, "train/Apple_leaf/train_Apple leaf_57.jpg") == saved
+    with pytest.raises(FileNotFoundError, match="Pear_leaf"):
+        demo.find_image(tmp_path, "train/Pear_leaf/train_Apple leaf_57.jpg")
