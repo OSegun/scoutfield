@@ -1,5 +1,5 @@
 .PHONY: install install-dev test lint fmt clean \
-        train-perception calibrate train-ppo sweep tau figures export-onnx app
+        train-perception calibrate train-ppo sweep tau figures export-onnx latency app
 
 PY ?= python
 
@@ -41,6 +41,9 @@ figures:            ## 6. rebuild every figure from results/summary.json
 
 export-onnx:        ## 8. export the trained classifier to ONNX and verify it (no push)
 	$(PY) experiments/08_export_onnx.py --config configs/deployment.yaml
+
+latency:            ## 8. time the exported classifier on this machine (no push)
+	$(PY) experiments/08_measure_latency.py --config configs/deployment.yaml
 
 # -------------------------------------------------------------------- app
 app:

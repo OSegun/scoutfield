@@ -168,3 +168,44 @@ def test_latency_reports_the_hardware_it_was_measured_on(exported):
     assert result["p95_ms"] >= result["median_ms"]
     for key in ("processor", "platform", "onnxruntime", "providers"):
         assert result["hardware"][key]
+
+
+def test_latency_record_carries_hardware_and_every_thread_count(exported, store,
+                                                                 monkeypatch, tmp_path):
+    from scoutfield.app import export_onnx
+
+    monkeypatch.setattr(export_onnx, "work_dir", lambda cfg, run: tmp_path)
+    (tmp_path / "classifier.onnx").write_bytes(exported["onnx"].read_bytes())
+    real = export_onnx.measure_latency
+    monkeypatch.setattr(export_onnx, "measure_latency",
+                        lambda path, **kw: real(path, **{**kw, "n_runs": 3, "warmup": 1}))
+
+    record = export_onnx.run_latency(store=store)
+    assert [m["intra_op_threads"] for m in record["measurements"]] == \
+        record["settings"]["intra_op_threads"]
+    for key in ("cpu_model", "logical_cores", "ram_gb", "os", "python", "onnxruntime"):
+        assert record["hardware"][key], key
+    assert (tmp_path / "deployment_latency.json").is_file()
+    assert "not drone hardware" in record["what"]
+
+
+def test_latency_push_is_refused_for_a_model_not_filed(exported, store, monkeypatch,
+                                                       tmp_path):
+    from scoutfield.app import export_onnx
+
+    monkeypatch.setattr(export_onnx, "work_dir", lambda cfg, run: tmp_path)
+    (tmp_path / "classifier.onnx").write_bytes(exported["onnx"].read_bytes())
+    real = export_onnx.measure_latency
+    monkeypatch.setattr(export_onnx, "measure_latency",
+                        lambda path, **kw: real(path, **{**kw, "n_runs": 2, "warmup": 1}))
+    with pytest.raises(ValueError, match="refusing to push"):
+        export_onnx.run_latency(store=store, push=True)
+    assert not store.has("08_deployment", "deployment_latency.json")
+
+
+def test_latency_without_an_export_names_the_command(store, monkeypatch, tmp_path):
+    from scoutfield.app import export_onnx
+
+    monkeypatch.setattr(export_onnx, "work_dir", lambda cfg, run: tmp_path)
+    with pytest.raises(FileNotFoundError, match="08_export_onnx.py"):
+        export_onnx.run_latency(store=store)

@@ -465,6 +465,26 @@ the opset, the input and output shapes, the result of the check, the git commit 
 whether the working tree was clean. Exported in eval mode, the model has dropout
 switched off, so it serves point estimates only; MC-dropout cannot be run from it.
 
+### Latency
+
+Latency is measured on the exported file with ONNX Runtime's CPU execution provider,
+because the target is a CPU-only on-board computer. It times the model call alone, not
+image decoding or resizing, and it is measured on the machine that runs the script,
+which for the reported figures is a laptop, not drone hardware.
+
+| Setting | Value | Why |
+| --- | --- | --- |
+| Batch size | 1 | a scout classifies one view at a time |
+| Warm-up calls | 50, discarded | the first calls pay for allocation and cache warm-up once per flight, not per image |
+| Timed calls | 500 | about 25 calls above the 95th percentile, so that percentile is not set by one slow call |
+| Repeats | 3 | a laptop's clock moves with temperature and turbo state; every repeat is recorded and the spread reported |
+| Threads | ONNX Runtime default, and 1 | the default uses every physical core; 1 shows the cost when the classifier gets one core beside other work |
+| Statistics | median and 95th percentile | tail latency decides whether a deadline is missed, and the mean hides it |
+
+Every measurement records the machine, read from the system rather than typed: CPU
+model, physical and logical cores, RAM, operating system, whether a laptop was on mains
+power (on battery the CPU is throttled), and the ONNX Runtime and Python versions.
+
 ---
 
 ## 7. Where results live

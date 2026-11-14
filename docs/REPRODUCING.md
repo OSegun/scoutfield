@@ -51,6 +51,7 @@ a resumed sweep treats two different runs as the same completed job and skips on
 | 5 | `python experiments/05_tau_sensitivity.py --config configs/sweep.yaml` | ~2.5 h for 2610 jobs, CPU | `tau_sensitivity.csv`, `tau_sensitivity_summary.json` (stage `05_tau`) |
 | 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 needs the uncertainty comparison and is not drawn |
 | 8 | `python experiments/08_export_onnx.py` | under a minute, CPU, laptop | `classifier.onnx`, `export_record.json` in `.artifact_cache/deployment/<run_id>/`; stage `08_deployment` only with `--push` |
+| 8 | `python experiments/08_measure_latency.py` | about a minute, CPU, laptop | `deployment_latency.json` beside the export; stage `08_deployment` only with `--push` |
 
 Runtimes are wall-clock times from run `r2026-11-13` on Kaggle: GPU T4 x2 for steps 0–3,
 CPU for steps 4–6. Steps 0 and 1 run in one notebook.
@@ -61,7 +62,12 @@ must agree within the tolerance in `configs/deployment.yaml`, or the script exit
 non-zero. `--checkpoint <path>` exports a local copy instead, with no network. The
 `.onnx` file is never written into the repository. `--push` files it in the store and is
 refused for a checkpoint the run did not record, or from a working tree with uncommitted
-changes.
+changes. `experiments/08_measure_latency.py` then times the exported file on this
+machine; its `--push` is refused unless that file is the `classifier.onnx` already filed
+in the store. Once both are pushed, the promotion step copies `export_record.json` and
+`deployment_latency.json` into `results/` and lists them in `results/RUN.json`, like
+every other result. A latency belongs to the machine it was measured on: re-running step
+8 elsewhere gives that machine's figure, not this one.
 
 Run step 3 for every seed in `ppo_train_seeds` in `configs/sweep.yaml` (0, 1 and 2). A
 single seed is not evidence of convergence.
@@ -141,7 +147,7 @@ stage that produced it.
 | Effect size against τ | `tau_sensitivity_summary.json`, `tau_sensitivity.csv` | step 5 |
 | Pre-registered predictions, held or not | judged from `summary.json` by the rules in `docs/METHOD.md`, section *"Pre-registered predictions"* | step 4 |
 | ONNX export check (max logit difference, predictions identical) | `export_record.json` → `verification` | step 8 |
-| ONNX latency (median, p95) | not measured in this release | step 8 |
+| ONNX latency (median, p95, range over repeats) and the machine it ran on | `deployment_latency.json` → `measurements`, `hardware` | step 8 |
 
 ---
 

@@ -71,6 +71,20 @@ def work_dir(config, run_id: str) -> Path:
     return out
 
 
+def _shown(path: str | Path) -> str:
+    """A path as recorded in a published file: relative to the repository when it is
+    inside or beside it, so no record carries this machine's user folder."""
+    import os.path
+
+    from scoutfield.utils.paths import repo_root
+
+    p = Path(path).resolve()
+    try:
+        return Path(os.path.relpath(p, repo_root())).as_posix()
+    except ValueError:  # another drive on Windows
+        return p.name
+
+
 def resolve_checkpoint(config, store=None, override: str | Path | None = None
                        ) -> tuple[Path, str]:
     """The checkpoint to export, and a description of where it came from.
@@ -87,7 +101,7 @@ def resolve_checkpoint(config, store=None, override: str | Path | None = None
                 f"no checkpoint at {path}. Pass the path of a local best.pt, or omit "
                 f"--checkpoint to pull it from the artefact store."
             )
-        return path, f"local file {path}"
+        return path, f"local file {_shown(path)}"
 
     from scoutfield.utils.artifacts import get_store
 
@@ -366,18 +380,47 @@ def _ram_gb() -> float | None:
         return None
 
 
+def _on_mains_power() -> bool | None:
+    """Whether a laptop was plugged in. On battery, Windows throttles the CPU, and a
+    latency measured that way is slower than the same machine plugged in."""
+    if sys.platform == "win32":
+        import ctypes
+
+        class _PowerStatus(ctypes.Structure):
+            _fields_ = [("ACLineStatus", ctypes.c_byte), ("BatteryFlag", ctypes.c_byte),
+                        ("BatteryLifePercent", ctypes.c_byte),
+                        ("SystemStatusFlag", ctypes.c_byte),
+                        ("BatteryLifeTime", ctypes.c_ulong),
+                        ("BatteryFullLifeTime", ctypes.c_ulong)]
+
+        status = _PowerStatus()
+        if ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(status)):
+            return {0: False, 1: True}.get(status.ACLineStatus)
+        return None
+    supply = Path("/sys/class/power_supply")
+    if supply.exists():
+        for online in supply.glob("A*/online"):
+            return online.read_text(encoding="utf-8").strip() == "1"
+    return None
+
+
 def measure_latency(onnx_path: str | Path, n_runs: int = 200, warmup: int = 20,
-                    image_size: int = 224, batch_size: int = 1, seed: int = 0) -> dict:
+                    image_size: int = 224, batch_size: int = 1, seed: int = 0,
+                    intra_op_threads: int = 0) -> dict:
     """Measure per-call inference latency on this machine.
 
     Median and p95, not the mean alone: tail latency determines whether a flight
     controller misses its deadline, and the mean hides it. The hardware is
     recorded alongside — a latency figure without the machine it was measured on
-    is not reproducible and does not belong in a report.
+    is not reproducible and does not belong in a report. ``intra_op_threads`` = 0
+    leaves ONNX Runtime's default thread count.
     """
     import onnxruntime as ort
 
-    session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = int(intra_op_threads)
+    session = ort.InferenceSession(str(onnx_path), sess_options=options,
+                                   providers=["CPUExecutionProvider"])
     x = np.random.default_rng(seed).standard_normal(
         (batch_size, 3, image_size, image_size)).astype(np.float32)
 
@@ -395,6 +438,7 @@ def measure_latency(onnx_path: str | Path, n_runs: int = 200, warmup: int = 20,
     hardware.update({
         "onnxruntime": ort.__version__,
         "providers": session.get_providers(),
+        "on_mains_power": _on_mains_power(),
         # Kept for compatibility with earlier readers of this dict.
         "processor": hardware["cpu_model"],
         "platform": hardware["os"],
@@ -408,6 +452,7 @@ def measure_latency(onnx_path: str | Path, n_runs: int = 200, warmup: int = 20,
         "n_runs": int(n_runs),
         "warmup_runs": int(warmup),
         "batch_size": int(batch_size),
+        "intra_op_threads": int(intra_op_threads),
         "throughput_images_per_s": float(batch_size * 1000.0 / np.median(timings_ms)),
         "hardware": hardware,
     }
@@ -457,4 +502,121 @@ def run_export(config_path: str | Path | None = None, checkpoint: str | Path | N
                                      export_cfg["checkpoint_file"])])
         print(f"pushed {onnx_path.name} and {record_path.name} to {stage} "
               f"of run {store.run_id}")
+    return record
+
+
+def locate_classifier(config, store) -> tuple[Path, str]:
+    """The exported classifier: this machine's export first, then the store's.
+
+    A missing file raises and names both places it looked and the command that
+    makes it.
+    """
+    export_cfg = config.section("export")
+    name = export_cfg["classifier_file"]
+    local = work_dir(config, store.run_id) / name
+    if local.is_file():
+        return local, f"local export {_shown(local)}"
+    stage = str(config["stage"])
+    pulled = store.pull(stage, name, required=False)
+    if pulled is not None:
+        return pulled, f"store {store.remote_path(stage, name)}"
+    raise FileNotFoundError(
+        f"no exported classifier for run {store.run_id}: looked for {local} and for "
+        f"{store.remote_path(stage, name)} in {store.backend.description}. Run "
+        f"`python experiments/08_export_onnx.py` first."
+    )
+
+
+def run_latency(config_path: str | Path | None = None, push: bool = False,
+                store=None) -> dict:
+    """Measure the exported classifier's latency at every configured thread count.
+
+    Writes ``deployment_latency.json`` beside the export. ``push`` files it in
+    stage ``08_deployment``, refused unless the measured file is the
+    ``classifier.onnx`` already filed there and the working tree is committed, so
+    a pushed latency always describes the pushed model.
+    """
+    import onnxruntime as ort
+
+    from scoutfield.config import load_config
+    from scoutfield.utils.artifacts import get_store, sha256_of
+    from scoutfield.utils.paths import repo_root
+
+    config = load_deployment_config(config_path)
+    lat = config.section("latency")
+    store = store or get_store()
+    onnx_path, source = locate_classifier(config, store)
+    image_size = int(load_config(repo_root() / "configs" / "perception.yaml")
+                     .section("data")["image_size"])
+
+    measurements, hardware = [], None
+    for threads in lat["intra_op_threads"]:
+        repeats = []
+        for _ in range(int(lat["repeats"])):
+            m = measure_latency(onnx_path, n_runs=int(lat["timed_runs"]),
+                                warmup=int(lat["warmup_runs"]), image_size=image_size,
+                                batch_size=int(lat["batch_size"]), seed=int(lat["seed"]),
+                                intra_op_threads=int(threads))
+            hardware = hardware or m["hardware"]
+            m.pop("hardware")
+            repeats.append(m)
+        medians = [r["median_ms"] for r in repeats]
+        p95s = [r["p95_ms"] for r in repeats]
+        summary = {
+            "intra_op_threads": int(threads),
+            # The middle repeat's figures, and the range across repeats.
+            "median_ms": float(np.median(medians)),
+            "median_ms_range": [float(min(medians)), float(max(medians))],
+            "p95_ms": float(np.median(p95s)),
+            "p95_ms_range": [float(min(p95s)), float(max(p95s))],
+            "throughput_images_per_s": float(int(lat["batch_size"]) * 1000.0
+                                             / np.median(medians)),
+            "repeats": repeats,
+        }
+        measurements.append(summary)
+        print(f"threads {threads} ({'default' if int(threads) == 0 else 'fixed'}): "
+              f"median {summary['median_ms']:.2f} ms "
+              f"(repeats {min(medians):.2f}-{max(medians):.2f}), "
+              f"p95 {summary['p95_ms']:.2f} ms (repeats {min(p95s):.2f}-{max(p95s):.2f})")
+
+    record = {
+        "run_id": store.run_id,
+        "measured_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "what": "ONNX Runtime CPU inference of the exported classifier, model call only "
+                "(no image decoding or resizing), on the laptop named under hardware; "
+                "not drone hardware",
+        "onnx": {"file": onnx_path.name, "sha256": sha256_of(onnx_path), "source": source},
+        "settings": {"execution_provider": "CPUExecutionProvider",
+                     "batch_size": int(lat["batch_size"]),
+                     "warmup_runs": int(lat["warmup_runs"]),
+                     "timed_runs": int(lat["timed_runs"]),
+                     "repeats": int(lat["repeats"]),
+                     "input_shape": [int(lat["batch_size"]), 3, image_size, image_size],
+                     "intra_op_threads": [int(t) for t in lat["intra_op_threads"]]},
+        "hardware": hardware,
+        "measurements": measurements,
+        **git_state(),
+        "versions": {"python": platform.python_version(), "onnxruntime": ort.__version__,
+                     "numpy": np.__version__},
+    }
+    out = work_dir(config, store.run_id) / lat["output_file"]
+    with out.open("w", encoding="utf-8") as fh:
+        json.dump(record, fh, indent=2)
+    print(f"wrote {out}")
+
+    if push:
+        stage = str(config["stage"])
+        filed = store.stage_entry(stage).get("files", {}) \
+            .get(config.section("export")["classifier_file"], {}).get("sha256")
+        if filed != record["onnx"]["sha256"]:
+            raise ValueError(
+                f"refusing to push: the measured model is not the classifier.onnx filed "
+                f"in {stage} of run {store.run_id}. Push the export first "
+                f"(`python experiments/08_export_onnx.py --push`)."
+            )
+        if record["git_dirty"]:
+            raise ValueError("refusing to push a measurement made from uncommitted code; "
+                             "commit first so the record names the code that made it.")
+        store.push(stage, [out], "latency of the exported classifier")
+        print(f"pushed {out.name} to {stage} of run {store.run_id}")
     return record

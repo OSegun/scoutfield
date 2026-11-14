@@ -41,3 +41,31 @@ export:
     # and below the fourth decimal place every calibration figure is reported to.
     # A larger difference fails the export.
     logit_atol: 1.0e-4
+
+latency:
+  # Measured with ONNX Runtime's CPU execution provider: the target is a CPU-only
+  # on-board computer, and a GPU figure would describe a machine the drone does not
+  # carry.
+  # One image per call, as a scout classifies one view at a time.
+  batch_size: 1
+  # Calls discarded before timing starts. The first calls pay for memory
+  # allocation and cache warm-up, which a flight pays once, not per image.
+  warmup_runs: 50
+  # Timed calls. 500 puts about 25 calls above the 95th percentile, enough for
+  # that percentile to be stable rather than set by one slow call.
+  timed_runs: 500
+  # The timed block is repeated this many times, each after its own warm-up, and
+  # every repeat is recorded. A laptop's clock speed moves with temperature and
+  # turbo state, so one block can be several milliseconds off another; the spread
+  # across repeats is reported instead of being hidden in one number.
+  repeats: 3
+  # Seed of the random input image. Latency does not depend on pixel values for
+  # this network (no data-dependent branches), but the input is still seeded.
+  seed: 0
+  # Threads ONNX Runtime may use inside one call. 0 means its default (one per
+  # physical core); 1 shows the cost when the classifier gets a single core, as it
+  # might beside a flight stack. A single laptop core is still faster than an
+  # embedded ARM core, so neither figure stands in for drone hardware. Both are
+  # measured and reported against the same hardware record.
+  intra_op_threads: [0, 1]
+  output_file: deployment_latency.json
