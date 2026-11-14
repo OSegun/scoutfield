@@ -1,0 +1,16 @@
+# Dependencies of the hosted demonstration only: Streamlit Community Cloud reads this
+# file because it sits beside the app's entrypoint, and the Cloud Run container
+# installs it. No PyTorch, torchvision or Stable-Baselines3: the app runs both models
+# with ONNX Runtime. The repository itself is not installed; the app adds its root
+# to the import path. Versions are those a clean install resolved on Python 3.12.
+#
+# The pilot, pinned to the tag that produced the published baseline.
+scoutplan @ git+https://github.com/OSegun/scoutplan.git@v1.0.0
+numpy==2.5.4
+pyyaml==6.0.3
+# the artefact store, read without a token
+huggingface_hub==2.4.0
+streamlit==1.67.0
+onnxruntime==1.32.0
+pillow==13.0.0
+matplotlib==3.11.2

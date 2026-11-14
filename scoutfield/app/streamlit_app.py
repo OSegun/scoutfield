@@ -43,7 +43,18 @@ Tint #EEF3EA, Ink #1F2A1F.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import numpy as np
+
+# `streamlit run` puts this file's folder on the import path, not the repository root.
+# Hosted copies run the clone without installing it (scoutfield/app/requirements.txt
+# lists only third-party packages), so the root is added here to make `scoutfield`
+# and the configs under it importable and findable.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 FOREST, MOSS, TINT, INK, MUTED = "#2C5F2D", "#97BC62", "#EEF3EA", "#1F2A1F", "#6B7A6B"
 TRUTH = "#B03A2E"
@@ -127,11 +138,13 @@ def _check_store(st, res) -> bool:
         missing = [f"{s}/{n}" for s, n in demo.required_files(res["config"]())
                    if n not in manifest.get("stages", {}).get(s, {}).get("files", {})]
     except Exception as exc:  # noqa: BLE001 - shown on the page, never swallowed
+        from scoutfield.utils.artifacts import load_settings
+
+        url = f"https://huggingface.co/datasets/{load_settings()['hub_repo']}"
         st.error(f"The demonstration's files could not be read. {exc}")
-        st.caption("Hosted: the public artefact store "
-                   "https://huggingface.co/datasets/OSegun/scoutfield-artifacts must be "
-                   "reachable. Laptop: run `python experiments/08_fill_demo_folder.py` "
-                   "once while online, then start with SCOUTFIELD_DEMO_SOURCE=offline.")
+        st.caption(f"Hosted: the public artefact store {url} must be reachable. "
+                   f"Laptop: run `{demo.FILL_COMMAND}` once while online, then start "
+                   "with SCOUTFIELD_DEMO_SOURCE=offline.")
         return False
     if missing:
         st.error(f"Run {store.run_id} in {store.backend.description} does not list "
