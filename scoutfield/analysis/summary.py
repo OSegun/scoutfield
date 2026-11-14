@@ -3,11 +3,11 @@ Aggregating sweep rows into ``results/summary.json``.
 
 Why a summary file exists at all
 --------------------------------
-The pilot's fifth invariant: "Paper numbers come from ``summary.json``. Never
-hard-code a result into ``paper_part*.py``." Every figure and every document
-reads from this one generated file, so text, figures and data cannot drift apart.
-The failure mode it prevents — a document quoting a number the code no longer
-produces — is silent, and it reached the pilot's `.docx` once already.
+A rule inherited from the pilot: every reported number comes from ``summary.json``
+and is never hard-coded into a document. Every figure and every document reads
+from this one generated file, so text, figures and data cannot drift apart. The
+failure mode it prevents — a document quoting a number the code no longer
+produces — is silent, and it happened in the pilot once already.
 
 Estimator choice is not free here. Per Agarwal et al. (2021) and Colas et al.
 (2018, 2019), the interquartile mean with a stratified bootstrap interval is used

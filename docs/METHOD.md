@@ -301,7 +301,7 @@ regime to hold.
 
 **Belief update.** Bayesian, via likelihood ratio. This is what makes miscalibration a
 *systematic bias in belief dynamics* rather than additive noise — and that mechanism is
-the paper's contribution, not an implementation detail.
+the project's contribution, not an implementation detail.
 
 **Termination.** Episodes end when the energy budget cannot fund another move. That is a
 genuine terminal state: there is no future return to bootstrap. In the Gymnasium wrapper

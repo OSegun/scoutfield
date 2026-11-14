@@ -62,7 +62,7 @@ class PPOPlanner:
 def _make_info_callback(episodes: list[dict] | None = None):
     """A callback recording the full ``info`` dict at every episode end.
 
-    Episode return is not the quantity the paper reports — detections-per-joule
+    Episode return is not the quantity the project reports — detections-per-joule
     is — so logging only the return would leave the learning curve measuring
     something other than the result. ``episodes`` seeds the record with what a
     resumed run had already logged, so the curve covers the whole of training.

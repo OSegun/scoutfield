@@ -5,6 +5,13 @@ phase of a completed pilot study — replacing the pilot's synthetic confidence 
 with a fine-tuned EfficientNet-B0 and its REINFORCE agent with PPO, to find out whether the
 pilot's effect was real or an artefact of the surrogate.
 
+| | |
+| --- | --- |
+| **Project** | Development of a Calibration-Aware UAV Path Planning Model for Efficient Crop Disease Detection Under Limited Battery Capacity |
+| **Type** | Research engineering project, Miva Open University |
+| **Author** | Oluwasegun Ibrahim Odusina |
+| **Supervisor** | Dr. Chukwuemeka Odi Agwu |
+
 [![tests](https://github.com/OSegun/scoutfield/actions/workflows/ci.yml/badge.svg)](https://github.com/OSegun/scoutfield/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -15,8 +22,8 @@ pilot's effect was real or an artefact of the surrogate.
 > Uncertainty methods and deployment measurements are not yet run. Nothing here has been
 > peer-reviewed.
 >
-> The **completed** work is the pilot study: 195 executed runs, 8 figures, a full write-up,
-> frozen in the companion repository [**scoutplan**](https://github.com/OSegun/scoutplan)
+> The **completed** work is the pilot study: 195 executed runs and 8 figures, frozen in the
+> companion repository [**scoutplan**](https://github.com/OSegun/scoutplan)
 > and pinned here at `v1.0.0`. This repository extends it; it does not replace it.
 
 ---
@@ -334,20 +341,32 @@ Inherited from the pilot, and the reason its numbers held up.
 
 ## Citing
 
-This phase's results (run `r2026-11-13`) are not yet written up as a paper. **Cite the
-pilot study's paper** — see [`CITATION.cff`](CITATION.cff). If you refer to a number from
-this repository, cite the repository, the release it appears in, and the run it comes
-from.
+Cite this repository, the release a number appears in, and the run it comes from — see
+[`CITATION.cff`](CITATION.cff).
 
 ```bibtex
-@mastersthesis{odusina2026calibration,
-  author = {Odusina, Oluwasegun Ibrahim},
-  title  = {Development and Evaluation of a Calibration-Aware {REINFORCE} Agent
-            for Energy-Efficient Aerial Agricultural Surveillance},
-  school = {Miva Open University},
-  year   = {2026},
-  type   = {Seminar paper},
-  note   = {Reproduction package: \url{https://github.com/OSegun/scoutplan}}
+@software{odusina2026scoutfield,
+  author  = {Odusina, Oluwasegun Ibrahim},
+  title   = {Development of a Calibration-Aware {UAV} Path Planning Model for Efficient
+             Crop Disease Detection Under Limited Battery Capacity},
+  year    = {2026},
+  version = {0.2.0},
+  url     = {https://github.com/OSegun/scoutfield},
+  note    = {Research engineering project, Miva Open University.
+             Supervisor: Dr. Chukwuemeka Odi Agwu. Results: run r2026-11-13}
+}
+```
+
+The pilot it extends:
+
+```bibtex
+@software{odusina2026scoutplan,
+  author  = {Odusina, Oluwasegun Ibrahim},
+  title   = {{ScoutPlan}: calibration-aware active sensing for energy-constrained aerial
+             crop scouting},
+  year    = {2026},
+  version = {1.0.0},
+  url     = {https://github.com/OSegun/scoutplan}
 }
 ```
 
@@ -371,5 +390,4 @@ networks. *ICML 36*.
 
 **Suggested GitHub topics:** `reinforcement-learning` `computer-vision`
 `uncertainty-quantification` `calibration` `informative-path-planning` `pytorch`
-`stable-baselines3` `precision-agriculture` `paper-implementations`
-`reproducible-research`
+`stable-baselines3` `precision-agriculture` `uav` `reproducible-research`

@@ -100,7 +100,7 @@ class OraclePlanner:
 def regret(planner_metric: float, oracle_metric: float) -> float:
     """Normalised regret in [0, 1]; 0 means the planner matched the oracle.
 
-    Report regret on detections-per-joule, which is the paper's headline metric,
+    Report regret on detections-per-joule, which is the project's headline metric,
     and separately on recall. A planner can have low regret on one and high regret
     on the other, and the pilot's finding that overconfidence trades precision for
     recall says that gap is exactly where the interesting behaviour lives.

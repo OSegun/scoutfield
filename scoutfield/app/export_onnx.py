@@ -142,7 +142,7 @@ def measure_latency(onnx_path: str, n_runs: int = 200, warmup: int = 20,
     Median and p95, not the mean: tail latency determines whether a flight
     controller misses its deadline, and the mean hides it. The hardware is
     recorded alongside — a latency figure without the machine it was measured on
-    is not reproducible and does not belong in a paper.
+    is not reproducible and does not belong in a report.
     """
     import onnxruntime as ort
 

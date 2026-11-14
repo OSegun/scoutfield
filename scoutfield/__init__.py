@@ -26,7 +26,7 @@ and ``import perception`` resolve to the *pilot*. Anything defined here is alway
 ``scoutfield.<...>``.
 """
 
-__version__ = "0.1.0.dev0"
+__version__ = "0.2.0"
 
 #: The pilot tag this package is developed against. Verified by
 #: tests/test_pilot_contract.py rather than at import time, to keep import cheap.

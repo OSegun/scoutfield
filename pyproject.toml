@@ -1,6 +1,6 @@
 [project]
 name = "scoutfield"
-version = "0.1.0.dev0"
+version = "0.2.0"
 description = "Calibration-aware informative path planning for energy-constrained aerial crop scouting: a real classifier and a PPO planner replacing the pilot's surrogate instrument"
 readme = "README.md"
 requires-python = ">=3.10"
