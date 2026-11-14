@@ -55,7 +55,7 @@ and it needs no budget.
 | 6. τ sensitivity | implemented |
 | 7. MC-dropout, deep ensembles, reliability diagrams | **partial**: reliability diagrams drawn (Figure 9); MC-dropout and deep ensembles not run |
 | 8. Oracle planner; regret | implemented |
-| 9. ONNX export, latency, deployed interface | **partial**: trained checkpoint exported and verified; latency measured on a laptop CPU; demonstration interface not yet updated |
+| 9. ONNX export, latency, deployed interface | **partial**: classifier and PPO policy exported and verified; latency measured on a laptop CPU; demonstration runs offline on a laptop; hosted copies not yet deployed |
 
 Results are in [`docs/RESULTS.md`](docs/RESULTS.md). Every number there is read from the
 files in `results/`, which are copies of one run's outputs; if the two disagree, the
@@ -169,7 +169,16 @@ python experiments/make_figures.py
 ```
 
 Same commands via `make train-perception`, `make calibrate`, `make train-ppo`, `make
-sweep`, `make tau`, `make figures`. Reproducing any specific number:
+sweep`, `make tau`, `make figures`.
+
+The demonstration, three panels showing the coupling under the conditions the experiment
+measured (settings in `configs/deployment.yaml`):
+
+```bash
+make app            # reads the public artefact store
+make demo-fill      # once, online: copies what the app reads into .demo_offline/
+make app-offline    # reads only that folder; runs with the network off
+``` Reproducing any specific number:
 [`docs/REPRODUCING.md`](docs/REPRODUCING.md).
 
 ---

@@ -82,12 +82,13 @@ class ScoutPlanInference:
     def preprocess(self, image) -> np.ndarray:
         """Resize and normalise exactly as evaluation did during training.
 
-        The transform is imported from ``perception.datasets`` rather than
-        rewritten: two copies drift, and a subtle mismatch here costs a few points
-        of accuracy and considerably more calibration, presenting as a mysterious
-        deployment regression rather than an obvious bug.
+        Uses ``perception.datasets.eval_array``, the torch-free twin of the training
+        code's evaluation transform, which a test holds equal to it: a subtle
+        mismatch here costs a few points of accuracy and considerably more
+        calibration, presenting as a mysterious deployment regression rather than
+        an obvious bug.
         """
-        from scoutfield.perception.datasets import _transforms
+        from scoutfield.perception.datasets import eval_array
 
         if isinstance(image, (str, Path)):
             from PIL import Image
@@ -99,8 +100,7 @@ class ScoutPlanInference:
         else:
             raise TypeError(f"expected a path or a PIL image, got {type(image)}")
 
-        tensor = _transforms(self.image_size, train=False)(image)
-        return tensor.unsqueeze(0).numpy().astype(np.float32)
+        return eval_array(image, self.image_size)[None]
 
     def predict(self, image, relative_temperature: float = 1.0) -> dict:
         """Return the probability, the prediction and the raw logit for one image.

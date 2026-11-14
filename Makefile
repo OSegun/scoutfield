@@ -1,5 +1,6 @@
 .PHONY: install install-dev test lint fmt clean \
-        train-perception calibrate train-ppo sweep tau figures export-onnx latency app
+        train-perception calibrate train-ppo sweep tau figures export-onnx latency \
+        export-policy demo-seed demo-samples demo-fill app app-offline
 
 PY ?= python
 
@@ -45,9 +46,24 @@ export-onnx:        ## 8. export the trained classifier to ONNX and verify it (n
 latency:            ## 8. time the exported classifier on this machine (no push)
 	$(PY) experiments/08_measure_latency.py --config configs/deployment.yaml
 
+export-policy:      ## 8. export the PPO policy to ONNX and verify its actions (no push)
+	$(PY) experiments/08_export_policy.py --config configs/deployment.yaml
+
+demo-seed:          ## choose the demonstration's default seed by rule (prints it)
+	$(PY) experiments/08_choose_demo_seed.py --config configs/deployment.yaml
+
+demo-samples:       ## choose sample images from the datasets in data/ (no push)
+	$(PY) experiments/08_select_samples.py --config configs/deployment.yaml
+
+demo-fill:          ## fill the offline folder from the store, once, while online
+	$(PY) experiments/08_fill_demo_folder.py --config configs/deployment.yaml
+
 # -------------------------------------------------------------------- app
-app:
+app:                ## the demonstration, reading the public artefact store
 	$(PY) -m streamlit run scoutfield/app/streamlit_app.py
+
+app-offline:        ## the demonstration, reading the offline folder only
+	SCOUTFIELD_DEMO_SOURCE=offline $(PY) -m streamlit run scoutfield/app/streamlit_app.py
 
 clean:
 	rm -rf __pycache__ .pytest_cache .ruff_cache build dist *.egg-info

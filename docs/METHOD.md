@@ -485,6 +485,37 @@ Every measurement records the machine, read from the system rather than typed: C
 model, physical and logical cores, RAM, operating system, whether a laptop was on mains
 power (on battery the CPU is throttled), and the ONNX Runtime and Python versions.
 
+### The PPO policy, exported
+
+For the demonstration the PPO policy trained with seed 0 (`policy` in
+`configs/deployment.yaml`) is exported to ONNX as well: the actor only, observation in
+and one score per action out, the deterministic action being the highest score, as
+Stable-Baselines3 chooses it. The export is accepted only if the ONNX and
+Stable-Baselines3 policies choose the same action on every one of at least 1,000
+observations from PPO's own episodes in the real environment, at T = 0.3, 1 and 4.
+
+### The demonstration
+
+The demonstration (`scoutfield/app/streamlit_app.py`) reproduces the experiment's
+conditions rather than restating them. Its settings are in `configs/deployment.yaml`
+under `demo`; the conditions it reproduces are read from the sweep's own configuration.
+
+| Element | As in the experiment |
+| --- | --- |
+| Classify panel temperature | the experiment's T: a multiplier on the shift-fitted temperature, so T = 1 shows the calibrated probability |
+| Image preprocessing | NumPy and Pillow, held equal to the training code's evaluation transform by a test |
+| Plan panel observations | the stored PlantDoc `shift_eval` logit pool, scaled by the shift-fitted temperature times T |
+| Field, energy, τ grid | `configs/ppo_field32.yaml` and `configs/sweep.yaml`, read, not repeated |
+| Planners | Lawnmower and GreedyEntropy from the pilot; PPO through its exported policy |
+| Default seed | chosen by `experiments/08_choose_demo_seed.py`: among 30 candidates, the seed whose single episodes at T = 1 and T = 4 are closest, in mean relative difference, to the sweep's IQM for the three planners |
+| Sample images | chosen by rule from the stage 02 pools: correct images at evenly spaced quantiles of confidence and the most confident mistakes |
+| Compare panel | the run's `summary.json`, the same file `docs/RESULTS.md` quotes |
+
+The Plan panel shows one episode, not a measured result, and says so; the Compare panel
+shows the measured result. The field is labelled as simulated. Sample images are
+PlantDoc (CC BY 4.0, credited on the page) and, on the laptop only, PlantVillage (CC
+BY-NC-SA 4.0).
+
 ---
 
 ## 7. Where results live

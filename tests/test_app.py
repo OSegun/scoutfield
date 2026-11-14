@@ -16,13 +16,18 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-torch = pytest.importorskip("torch")
 pytest.importorskip("onnxruntime")
+
+try:  # only the export tests need torch; the demonstration's tests run without it
+    import torch
+except ImportError:  # pragma: no cover - depends on the environment
+    torch = None
 
 
 @pytest.fixture(scope="module")
 def exported(tmp_path_factory):
     """An exported ONNX model plus the torch model it came from."""
+    pytest.importorskip("torch")
     from scoutfield.app.export_onnx import export
     from scoutfield.config import load_config
     from scoutfield.perception.model import build_model
@@ -313,3 +318,221 @@ def test_panel2_runs_without_importing_torch(store, tmp_path):
                          timeout=300, check=False)
     assert out.returncode == 0, out.stderr
     assert out.stdout.strip().endswith("ok")
+
+
+# ------------------------------- demonstration: policy, offline folder, samples
+#
+# None of these needs the network, downloaded weights or PyTorch: the classifier
+# and the policy are tiny ONNX graphs built here, and the store is a directory.
+
+N_OBS, N_ACTIONS = 206, 8
+
+
+def _tiny_classifier(path):
+    """``image`` (N, 3, 224, 224) -> ``logit`` (N,): the mean pixel times 3."""
+    import onnx
+    from onnx import TensorProto, helper
+
+    graph = helper.make_graph(
+        [helper.make_node("ReduceMean", ["image"], ["m"], axes=[1, 2, 3], keepdims=0),
+         helper.make_node("Mul", ["m", "k"], ["logit"])],
+        "tiny_classifier",
+        [helper.make_tensor_value_info("image", TensorProto.FLOAT, ["N", 3, 224, 224])],
+        [helper.make_tensor_value_info("logit", TensorProto.FLOAT, ["N"])],
+        [helper.make_tensor("k", TensorProto.FLOAT, [], [3.0])],
+    )
+    onnx.save(helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)]), path)
+    return path
+
+
+def _tiny_policy(path, seed=0):
+    """``observation`` (N, 206) -> ``action_scores`` (N, 8): one linear layer."""
+    import onnx
+    from onnx import TensorProto, helper, numpy_helper
+
+    w = np.random.default_rng(seed).normal(size=(N_OBS, N_ACTIONS)).astype(np.float32)
+    graph = helper.make_graph(
+        [helper.make_node("MatMul", ["observation", "w"], ["action_scores"])],
+        "tiny_policy",
+        [helper.make_tensor_value_info("observation", TensorProto.FLOAT, ["N", N_OBS])],
+        [helper.make_tensor_value_info("action_scores", TensorProto.FLOAT,
+                                       ["N", N_ACTIONS])],
+        [numpy_helper.from_array(w, "w")],
+    )
+    onnx.save(helper.make_model(graph, opset_imports=[helper.make_opsetid("", 17)]), path)
+    return path, w
+
+
+def test_onnx_policy_acts_by_the_highest_score(tmp_path):
+    from scoutfield.app.export_policy import ONNXPolicy
+
+    path, w = _tiny_policy(tmp_path / "policy.onnx")
+    policy = ONNXPolicy(path)
+    rng = np.random.default_rng(1)
+    for _ in range(50):
+        obs = rng.normal(size=N_OBS)
+        assert policy.act(obs, None) == int(np.argmax(obs.astype(np.float32) @ w))
+
+
+def test_onnx_policy_without_a_file_names_the_export_command(tmp_path):
+    from scoutfield.app.export_policy import ONNXPolicy
+
+    with pytest.raises(FileNotFoundError, match="08_export_policy.py"):
+        ONNXPolicy(tmp_path / "absent.onnx")
+
+
+def test_panel2_flies_ppo_through_the_onnx_policy(store, tmp_path):
+    """PPO runs in Panel 2 from the exported policy, on the sweep's pool."""
+    from scoutfield.app import demo
+    from scoutfield.app.export_policy import ONNXPolicy
+
+    _synthetic_calibration_store(store, tmp_path)
+    settings = demo.load_settings()
+    pool = demo.load_pool(settings.pool_split, store=store)
+    policy = ONNXPolicy(_tiny_policy(tmp_path / "policy.onnx")[0])
+    run = demo.run_episode(demo.get_planner("ppo", 0, policy), settings, pool, FITTED,
+                           temperature=1.0, seed=0)
+    assert run["info"]["coverage"] > 0
+    assert run["classifier"].pool_split == "shift_eval"
+    with pytest.raises(ValueError, match="policy"):
+        demo.get_planner("ppo", 0, None)
+
+
+def _offline_config(tmp_path):
+    from scoutfield.app import demo
+    from scoutfield.config import Config
+
+    cfg = demo.deployment_config()
+    data = {**cfg.data, "demo": {**cfg.data["demo"], "offline_dir": str(tmp_path / "offline")}}
+    return Config(data=data, path=cfg.path)
+
+
+def _full_source_store(store, tmp_path):
+    """A source store holding every file the app reads, all synthetic."""
+    import json
+
+    from scoutfield.app import demo
+
+    config = demo.deployment_config()
+    _synthetic_calibration_store(store, tmp_path)
+    summary = tmp_path / "summary.json"
+    summary.write_text(json.dumps({"cells": {}, "agents": [], "degradation": {}}),
+                       encoding="utf-8")
+    store.push("04_sweep", [summary], "synthetic summary")
+    classifier = _tiny_classifier(tmp_path / "classifier.onnx")
+    policy, _ = _tiny_policy(tmp_path / config.section("policy")["policy_file"])
+    store.push("08_deployment", [classifier, policy], "synthetic exports")
+    return config
+
+
+def test_offline_folder_runs_the_demo_with_the_store_unreachable(store, tmp_path,
+                                                                  monkeypatch):
+    """Filled once, the offline folder serves every panel with no network."""
+    from PIL import Image
+
+    from scoutfield.app import demo
+    from scoutfield.app.inference import ScoutPlanInference
+    from scoutfield.utils import artifacts
+
+    _full_source_store(store, tmp_path)
+    config = _offline_config(tmp_path)
+    report = demo.fill_offline(store, config)
+    assert len(report["files"]) == len(demo.required_files(config))
+
+    # From here on, any attempt to reach the hub fails, and the local-store
+    # override is cleared, so only the offline folder can answer.
+    def unreachable(*args, **kwargs):
+        raise OSError("network is switched off in this test")
+
+    monkeypatch.setattr(artifacts, "HubBackend", unreachable)
+    monkeypatch.delenv(artifacts.LOCAL_STORE_ENV, raising=False)
+    monkeypatch.setenv(demo.SOURCE_ENV, "offline")
+    monkeypatch.setattr(demo, "deployment_config", lambda: config)
+    settings_file = artifacts.load_settings()
+    monkeypatch.setattr(artifacts, "load_settings",
+                        lambda path=None: {**settings_file, "run_id": store.run_id})
+
+    offline = demo.open_store(config)
+    settings = demo.load_settings()
+    pool = demo.load_pool(settings.pool_split, store=offline)
+    reference = demo.fitted_temperature(settings.reference_condition, store=offline)
+    model = ScoutPlanInference.from_results(
+        offline.pull("08_deployment", "classifier.onnx"), condition="shift_fitted",
+        store=offline)
+    out = model.predict(Image.new("RGB", (300, 260), (120, 160, 90)))
+    assert out["probability"] == pytest.approx(_sigmoid(out["logit"] / FITTED))
+
+    policy = demo.load_policy(offline, config)
+    for name in demo.PLANNERS:
+        run = demo.run_episode(demo.get_planner(name, 0, policy), settings, pool, reference,
+                               1.0, 0)
+        assert "detections_per_joule" in run["info"]
+    assert offline.pull_json("04_sweep", "summary.json")["cells"] == {}
+
+
+def test_offline_folder_is_checked_against_the_manifest(store, tmp_path):
+    """A file changed after filling is refused, as in the online store."""
+    from scoutfield.app import demo
+
+    _full_source_store(store, tmp_path)
+    config = _offline_config(tmp_path)
+    demo.fill_offline(store, config)
+    pool = demo.offline_root(config) / "store" / "runs" / store.run_id / \
+        "02_calibration" / "logit_pool_shift_eval.npz"
+    pool.write_bytes(pool.read_bytes() + b"\0")
+    offline = demo.offline_store(config, run_id=store.run_id)
+    with pytest.raises(ValueError, match="sha256 mismatch"):
+        offline.pull("02_calibration", "logit_pool_shift_eval.npz")
+
+
+def test_an_empty_offline_folder_names_the_fill_command(tmp_path):
+    from scoutfield.app import demo
+
+    with pytest.raises(FileNotFoundError, match="08_fill_demo_folder.py"):
+        demo.offline_store(_offline_config(tmp_path), run_id="rtest")
+
+
+def test_demo_source_is_a_setting_with_a_default(monkeypatch):
+    from scoutfield.app import demo
+
+    monkeypatch.delenv(demo.SOURCE_ENV, raising=False)
+    assert demo.demo_source() == "store"
+    monkeypatch.setenv(demo.SOURCE_ENV, "offline")
+    assert demo.demo_source() == "offline"
+    monkeypatch.setenv(demo.SOURCE_ENV, "elsewhere")
+    with pytest.raises(ValueError, match="elsewhere"):
+        demo.demo_source()
+
+
+def test_torch_free_preprocessing_equals_the_training_transform():
+    """The deployed preprocessing must give the pixels evaluation gave, exactly."""
+    pytest.importorskip("torchvision")
+    from PIL import Image
+
+    from scoutfield.perception.datasets import _transforms, eval_array
+
+    rng = np.random.default_rng(0)
+    for w, h in [(256, 256), (640, 480), (480, 640), (300, 1000), (225, 225)]:
+        image = Image.fromarray((rng.random((h, w, 3)) * 255).astype("uint8"))
+        np.testing.assert_array_equal(eval_array(image, 224),
+                                      _transforms(224, train=False)(image).numpy())
+
+
+def test_samples_are_chosen_by_rule_from_the_pool(tmp_path):
+    from scoutfield.app import demo
+    from scoutfield.perception.adapter import save_logit_pool
+
+    logits = {1: np.array([3.0, 2.0, 1.0, 0.5, -4.0, -0.2]),
+              0: np.array([-3.0, -2.0, -1.0, -0.5, 5.0, 0.1])}
+    paths = {k: [f"test/c{k}/img{i}.jpg" for i in range(6)] for k in logits}
+    pool = tmp_path / "pool.npz"
+    save_logit_pool(pool, logits, paths)
+
+    picks = demo.select_samples(pool, 2, 2, 2)
+    right = [p for p in picks if p["correct"]]
+    wrong = [p for p in picks if not p["correct"]]
+    assert len(right) == 4 and all((p["logit"] > 0) == bool(p["label"]) for p in right)
+    # The most confident mistakes, one of each kind: a missed disease (-4.0) and a
+    # false alarm (+5.0).
+    assert sorted(p["logit"] for p in wrong) == [-4.0, 5.0]
+    assert picks == demo.select_samples(pool, 2, 2, 2)  # deterministic

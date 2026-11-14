@@ -52,6 +52,7 @@ a resumed sweep treats two different runs as the same completed job and skips on
 | 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 needs the uncertainty comparison and is not drawn |
 | 8 | `python experiments/08_export_onnx.py` | under a minute, CPU, laptop | `classifier.onnx`, `export_record.json` in `.artifact_cache/deployment/<run_id>/`; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_measure_latency.py` | about a minute, CPU, laptop | `deployment_latency.json` beside the export; stage `08_deployment` only with `--push` |
+| 8 | `python experiments/08_export_policy.py` | about a minute, CPU, laptop | `policy_ppo_seed0.onnx`, `policy_export_record.json` beside the export; stage `08_deployment` only with `--push` |
 
 Runtimes are wall-clock times from run `r2026-11-13` on Kaggle: GPU T4 x2 for steps 0–3,
 CPU for steps 4–6. Steps 0 and 1 run in one notebook.
@@ -68,6 +69,12 @@ in the store. Once both are pushed, the promotion step copies `export_record.jso
 `deployment_latency.json` into `results/` and lists them in `results/RUN.json`, like
 every other result. A latency belongs to the machine it was measured on: re-running step
 8 elsewhere gives that machine's figure, not this one.
+
+`experiments/08_export_policy.py` exports the PPO policy trained with seed 0 for the
+demonstration, which runs it with ONNX Runtime alone. It flies PPO's own episodes in the
+real environment and, at every step, asks both the ONNX policy and the Stable-Baselines3
+policy for an action; at least 1,000 observations are compared, and any differing action
+makes it exit non-zero. Its `--push` follows the same rules as the classifier's.
 
 Run step 3 for every seed in `ppo_train_seeds` in `configs/sweep.yaml` (0, 1 and 2). A
 single seed is not evidence of convergence.
@@ -123,6 +130,24 @@ snapshot_download("OSegun/scoutfield-artifacts", repo_type="dataset",
 `results/` and `figures/` is listed in `results/RUN.json` with the SHA-256 the manifest
 recorded for it, so the tracked results can be checked against the run byte for byte.
 
+The scripts that operate the store on the author's accounts (uploading, promoting,
+verifying a stage) are kept outside this repository, and none is needed to check a run.
+From the repository root, this compares every promoted file with the SHA-256 that
+`results/RUN.json` recorded for it:
+
+```python
+import hashlib, json, pathlib
+
+run = json.loads(pathlib.Path("results/RUN.json").read_text(encoding="utf-8"))
+for f in run["files"]:
+    digest = hashlib.sha256(pathlib.Path(f["path"]).read_bytes()).hexdigest()
+    print("ok      " if digest == f["sha256"] else "MISMATCH", f["path"])
+```
+
+Every line should read `ok`. To check the run in the store as well, download it with
+`snapshot_download` above and compare each entry of `results/RUN.json` with the
+`sha256` that `runs/<run_id>/manifest.json` records for the same stage and file.
+
 ---
 
 ## 3. Number → command
@@ -167,11 +192,12 @@ manifest of the old run is the record of what it produced.
 Do not delete files from `results/` or `figures/` either. They are the promoted outputs of
 one run, listed in `results/RUN.json`, not resume state.
 
-**Running steps 4–6 on a laptop writes into this clone's `results/` and `figures/`**, over
-the promoted files (the sweep's working files are set by `runner` in
-`configs/sweep.yaml`). On Kaggle this is harmless: each session writes into its own clone.
-Locally, run them in a separate clone, or restore the promoted files afterwards with
-`git checkout -- results figures`.
+**A stage run on a laptop never writes into `results/` or `figures/`.** Its working files
+go to `local_work_dir` in `configs/artifacts.yaml` (`.artifact_cache/work/`, gitignored):
+the sweep's done-registry, CSV and summary under `results/` there (file names set by
+`runner` in `configs/sweep.yaml`), figures under `figures/` there. On Kaggle they go to
+`/kaggle/working`. The repository's own `results/` and `figures/` are written by the
+promotion step only, from the store.
 
 ### The `__main__` guard is not optional
 
@@ -236,3 +262,47 @@ to each notebook. Uploading a notebook again with `kaggle kernels push` can deta
 secret; the first cell then stops within seconds and says so. Only `/kaggle/working`
 survives a session, so every long job pushes its progress to the artefact store as it
 goes and resumes from there, as described above.
+
+---
+
+## 7. Running the demonstration
+
+`scoutfield/app/streamlit_app.py` is one app with three panels: Classify, Plan and
+Compare. It shows what the experiment measured, under the conditions it measured. Every
+setting is in `configs/deployment.yaml` under `demo`, and every file it reads comes
+from the artefact store, by one code path. Where that store is depends on one setting:
+`demo.source`, overridden by the environment variable `SCOUTFIELD_DEMO_SOURCE`.
+`store` means the public store, read-only, with no token. `offline` means a local
+folder. The app imports no PyTorch.
+
+### On a laptop, offline
+
+Once, while online:
+
+```bash
+python experiments/08_select_samples.py      # optional: needs the two datasets in data/
+python experiments/08_fill_demo_folder.py
+```
+
+The first command picks sample images by rule from the stage 02 records (see
+`demo.samples`). It needs PlantDoc (Kaggle `nirmalsankalana/plantdoc-dataset`) and
+PlantVillage (Kaggle `abdallahalidev/plantvillage-dataset`) unpacked under `data/`. The
+second copies every file the app reads, and the laptop-only samples, into
+`.demo_offline/` (gitignored). Each file is checked against the run's manifest when it
+is copied and again whenever it is read.
+
+Then, with the network switched off:
+
+```bash
+make app-offline
+```
+
+In PowerShell, which has no `make`:
+
+```powershell
+$env:SCOUTFIELD_DEMO_SOURCE = "offline"; python -m streamlit run scoutfield/app/streamlit_app.py
+```
+
+If the folder is empty, the page says so and names the fill command. The default
+evaluation seed of the Plan panel is chosen by `experiments/08_choose_demo_seed.py`,
+which prints the table it chose from.

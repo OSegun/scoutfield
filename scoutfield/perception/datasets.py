@@ -39,6 +39,10 @@ from scoutfield.utils.paths import data_dir
 # would surface as a distribution-shift effect that is really a preprocessing bug.
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
+# Evaluation resizes the shorter side to image_size * 1.14 before a centre crop to
+# image_size: the usual ImageNet evaluation ratio (256 / 224), so the crop keeps the
+# middle of the leaf and drops the border.
+EVAL_RESIZE_FACTOR = 1.14
 
 # --------------------------------------------------------------- label mapping
 # The two datasets name their classes by incompatible conventions, and one regex
@@ -340,11 +344,43 @@ def _transforms(image_size: int, train: bool):
             transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
         ])
     return transforms.Compose([
-        transforms.Resize(int(image_size * 1.14)),
+        transforms.Resize(int(image_size * EVAL_RESIZE_FACTOR)),
         transforms.CenterCrop(image_size),
         transforms.ToTensor(),
         transforms.Normalize(IMAGENET_MEAN, IMAGENET_STD),
     ])
+
+
+def eval_array(image, image_size: int):
+    """The evaluation transform in NumPy and Pillow, without torch.
+
+    The deployed demonstration runs with ONNX Runtime and has no PyTorch, so it
+    cannot call ``_transforms``. This reproduces ``_transforms(image_size,
+    train=False)`` step by step: bilinear resize of the shorter side to
+    ``int(image_size * EVAL_RESIZE_FACTOR)`` (the long side scaled and truncated as
+    torchvision does), centre crop, scale to [0, 1], ImageNet normalisation. It
+    returns a float32 array of shape ``(3, image_size, image_size)``.
+    ``tests/test_app.py`` asserts it equals the torchvision transform, so the two
+    cannot drift apart unnoticed.
+    """
+    import numpy as np
+    from PIL import Image
+
+    image = image.convert("RGB")
+    short = int(image_size * EVAL_RESIZE_FACTOR)
+    w, h = image.size
+    if w <= h:
+        size = (short, int(short * h / w))
+    else:
+        size = (int(short * w / h), short)
+    image = image.resize(size, Image.BILINEAR)
+    w, h = image.size
+    top = round((h - image_size) / 2.0)
+    left = round((w - image_size) / 2.0)
+    image = image.crop((left, top, left + image_size, top + image_size))
+    x = np.asarray(image, dtype=np.float32) / 255.0
+    x = (x - np.asarray(IMAGENET_MEAN, np.float32)) / np.asarray(IMAGENET_STD, np.float32)
+    return np.ascontiguousarray(x.transpose(2, 0, 1), dtype=np.float32)
 
 
 def item_key(path: Path) -> str:

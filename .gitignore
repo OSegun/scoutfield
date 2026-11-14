@@ -52,3 +52,8 @@ kaggle.json
 
 # ------------------------------------------------------- artefact store cache
 .artifact_cache/
+
+# ------------------------------------------- demonstration's offline folder
+# Copies of store files and sample images (some under a non-commercial licence);
+# filled by experiments/08_fill_demo_folder.py, never committed.
+.demo_offline/

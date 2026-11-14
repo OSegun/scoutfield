@@ -22,6 +22,10 @@ Inputs and outputs are files in the artefact store (`configs/artifacts.yaml`), b
 | `make_figures.py` | — | stages 02–05 | Figures 9–15 (`06_figures`) |
 | `08_export_onnx.py` | 9 | `01_perception/best.pt` | `classifier.onnx`, `export_record.json` (local; `08_deployment` with `--push`) |
 | `08_measure_latency.py` | 9 | the exported `classifier.onnx` | `deployment_latency.json` (local; `08_deployment` with `--push`) |
+| `08_export_policy.py` | 9 | `03_ppo/ppo_seed0.zip`, `02_calibration` | `policy_ppo_seed0.onnx`, `policy_export_record.json` (local; `08_deployment` with `--push`) |
+| `08_choose_demo_seed.py` | 9 | `02_calibration`, `04_sweep/summary.json`, the exported policy | prints the demonstration's default seed |
+| `08_select_samples.py` | 9 | `02_calibration` pools, both datasets in `data/` | sample images and `demo_samples.json` (local; PlantDoc ones to `08_deployment` with `--push`) |
+| `08_fill_demo_folder.py` | 9 | every file the demonstration reads | `.demo_offline/` (local only) |
 
 ## Order
 
