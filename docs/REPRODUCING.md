@@ -49,15 +49,16 @@ a resumed sweep treats two different runs as the same completed job and skips on
 | 3 | `python experiments/03_train_ppo.py --config configs/ppo_field32.yaml --seed <N>` | ~25 min per seed, GPU | `ppo_seed<N>.zip`, `ppo_seed<N>_resume.zip`, `ppo_curve_seed<N>.json` (stage `03_ppo`) |
 | 4 | `while JOB_BUDGET=60 python experiments/04_sweep.py --config configs/sweep.yaml; do :; done` | ~81 min for 735 jobs, CPU | `sweep_results.csv`, `summary.json`, `sweep_metadata.json` (stage `04_sweep`) |
 | 5 | `python experiments/05_tau_sensitivity.py --config configs/sweep.yaml` | ~2.5 h for 2610 jobs, CPU | `tau_sensitivity.csv`, `tau_sensitivity_summary.json` (stage `05_tau`) |
-| 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 once step 7 has run |
-| 7 | `python experiments/07_uncertainty.py train --member <k>` for k = 1 to 4, then `python experiments/07_uncertainty.py evaluate`, then `python experiments/make_figures.py --only 16` | about 40 min per member (step 1's time), GPU; not yet run | `member<k>_best.pt`, `member<k>_last.pt`, `member<k>_summary.json`, `uncertainty_comparison.json` (stage `07_uncertainty`); Figure 16 (stage `06_figures`) |
+| 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 is drawn by step 7 |
+| 7 | `python experiments/07_uncertainty.py train --member <k>` for k = 1 to 4, then `python experiments/07_uncertainty.py evaluate`, then `python experiments/make_figures.py --only 16` | about 36 min per member (the four members were filed 36 min apart), then about 9 min to evaluate, GPU | `member<k>_best.pt`, `member<k>_last.pt`, `member<k>_summary.json`, `uncertainty_comparison.json` (stage `07_uncertainty`); Figure 16 (stage `06_figures`) |
 | 8 | `python experiments/08_export_onnx.py` | under a minute, CPU, laptop | `classifier.onnx`, `export_record.json` in `.artifact_cache/deployment/<run_id>/`; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_measure_latency.py` | about a minute, CPU, laptop | `deployment_latency.json` beside the export; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_check_demo_logits.py` | under a minute, CPU, laptop | `demo_logit_check.json` beside the export; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_export_policy.py` | about a minute, CPU, laptop | `policy_ppo_seed0.onnx`, `policy_export_record.json` beside the export; stage `08_deployment` only with `--push` |
 
 Runtimes are wall-clock times from run `r2026-11-13` on Kaggle: GPU T4 x2 for steps 0–3,
-CPU for steps 4–6. Steps 0 and 1 run in one notebook.
+CPU for steps 4–6, and a Kaggle GPU for step 7 (the member summaries record `cuda`; the
+GPU model was not recorded). Steps 0 and 1 run in one notebook.
 
 Step 8 reads `best.pt` from stage `01_perception` of the store, exports it to ONNX, and
 runs ONNX and PyTorch on the same inputs: the hard predictions must match and the logits
@@ -181,6 +182,10 @@ stage that produced it.
 | Regret against the oracle | computed from `summary.json` → `cells` as 1 − planner / oracle; Figure 15 | steps 4 and 6 |
 | Effect size against τ | `tau_sensitivity_summary.json`, `tau_sensitivity.csv` | step 5 |
 | Pre-registered predictions, held or not | judged from `summary.json` by the rules in `docs/METHOD.md`, section *"Pre-registered predictions"* | step 4 |
+| Ensemble members' accuracy and best epoch | `member<k>_summary.json` → `accuracy`, `accuracy_shift_eval`, `best_epoch` | step 7 |
+| Uncertainty methods: accuracy, fitted temperature, ECE, signed error, NLL, Brier, raw and fitted | `uncertainty_comparison.json` → `methods` | step 7 |
+| Uncertainty methods: variance on right and wrong predictions | `uncertainty_comparison.json` → `methods` → `spread` | step 7 |
+| Agreement of temperature scaling with stage 02 | `uncertainty_comparison.json` → `consistency_with_stage02` | step 7 |
 | ONNX export check (max logit difference, predictions identical) | `export_record.json` → `verification` | step 8 |
 | ONNX latency (median, p95, range over repeats) and the machine it ran on | `deployment_latency.json` → `measurements`, `hardware` | step 8 |
 
@@ -335,7 +340,13 @@ visit, which takes up to a minute.
 
 ### Hosted: Google Cloud Run
 
-The fallback, from the container defined by `Dockerfile` (with `.dockerignore`, which
+Optional, and not deployed for run `r2026-11-13`: the Streamlit Community Cloud copy
+above is the hosted demonstration. Before deploying, measure the container again with
+the largest upload batch: its 523 MiB peak was measured before the "Analyse your
+leaves" panel existed, and that panel raised the laptop peak from about 230 MB to
+524 MB, so `--memory 1Gi` below must be confirmed rather than assumed.
+
+A fallback, from the container defined by `Dockerfile` (with `.dockerignore`, which
 admits only `scoutfield/`, `configs/` and `LICENSE`). Built and run locally first:
 
 ```bash

@@ -17,10 +17,11 @@ pilot's effect was real or an artefact of the surrogate.
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![pilot](https://img.shields.io/badge/pilot-scoutplan%20v1.0.0-2C5F2D)](https://github.com/OSegun/scoutplan)
 
-> **Status: research in progress, not a finished study.** The pipeline is built and has run
-> end to end. **Results: run `r2026-11-13`, reported in [`docs/RESULTS.md`](docs/RESULTS.md).**
-> The classifier's ONNX latency is measured on a laptop; uncertainty methods are not yet
-> run. Nothing here has been peer-reviewed.
+> **Status: complete for run `r2026-11-13`.** Every roadmap item is done: the pipeline is
+> built and has run end to end, and the results are reported in
+> [`docs/RESULTS.md`](docs/RESULTS.md).
+> The classifier's ONNX latency is measured on a laptop; temperature scaling, MC-dropout
+> and a deep ensemble are compared on field images. Nothing here has been peer-reviewed.
 >
 > **Live demonstration: <https://scoutfield.streamlit.app/>** (Streamlit Community Cloud).
 > It sleeps after 12 hours without visitors; the first visit after that wakes it, which
@@ -57,9 +58,9 @@ and it needs no budget.
 | 4. `FieldScoutEnv`: 32×32, ≤40% coverage | implemented |
 | 5. PPO to convergence | implemented |
 | 6. τ sensitivity | implemented |
-| 7. MC-dropout, deep ensembles, reliability diagrams | **partial**: reliability diagrams drawn (Figure 9); MC-dropout and deep ensembles not run |
+| 7. MC-dropout, deep ensembles, reliability diagrams | implemented: temperature scaling, MC-dropout and a five-member deep ensemble compared on PlantDoc `shift_eval`, raw and with each method's fitted temperature (Figure 16); calibration only, not flown by the planners |
 | 8. Oracle planner; regret | implemented |
-| 9. ONNX export, latency, deployed interface | **partial**: classifier and PPO policy exported and verified; latency measured on a laptop CPU; demonstration live on Streamlit Community Cloud at <https://scoutfield.streamlit.app/> and runs offline on a laptop; Google Cloud Run copy not yet deployed |
+| 9. ONNX export, latency, deployed interface | implemented: classifier and PPO policy exported and verified; latency measured on a laptop CPU; demonstration live on Streamlit Community Cloud at <https://scoutfield.streamlit.app/> and runs offline on a laptop. A Google Cloud Run copy is optional and not deployed; its container is defined in `Dockerfile` |
 
 Results are in [`docs/RESULTS.md`](docs/RESULTS.md). Every number there is read from the
 files in `results/`, which are copies of one run's outputs; if the two disagree, the
@@ -90,10 +91,18 @@ underconfident ratio runs from 1.13 at τ = 0.55 to no detections at all at `T` 
 not; the rules and values are in `docs/RESULTS.md`, section *"5. Pre-registered
 predictions"*.
 
+The classifier's own uncertainty was compared three ways on the same field images. Raw,
+temperature scaling, MC-dropout and a five-member deep ensemble are all overconfident by
+a similar margin (ECE 0.1274, 0.1246 and 0.1178), and each needs a fitted temperature
+near 3.2 to 3.3. With it, MC-dropout (0.0137) and temperature scaling (0.0145) end close
+and the ensemble ends worse (0.0238). MC-dropout's and the ensemble's spread is about
+three times larger on wrong predictions than on right ones. Details in
+`docs/RESULTS.md`, section *"7. Uncertainty methods"*.
+
 **Checkpoints and every intermediate file** (classifier weights, logit pools, PPO
 policies, resume state and the run manifest) are in the public artefact store, pinned to
 the revision the results were taken from:
-[`runs/r2026-11-13`](https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/699392734c937bcb827d99dff3244523fbf6d43d/runs/r2026-11-13).
+[`runs/r2026-11-13`](https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/a966683c1c7fba5bebb91e981e3c80061e1f260e/runs/r2026-11-13).
 `results/RUN.json` lists every file promoted into this repository with its SHA-256;
 `docs/REPRODUCING.md` shows how to download the run and check it.
 
@@ -127,8 +136,11 @@ Stated here rather than left for a reviewer to find.
 - **The τ sweep evaluates one PPO policy.** For cost, PPO's τ runs use the seed 0 policy
   at the median cluster scale only, so its τ curve has 5 runs per point against 15 for
   each baseline.
-- **Uncertainty methods are not run in this release.** MC-dropout and deep ensembles are
-  not compared.
+- **Uncertainty methods are compared on calibration only.** MC-dropout and the deep
+  ensemble are scored against temperature scaling on the same images, but the planners
+  were flown on temperature-scaled logits only; whether either would change where a drone
+  flies is not measured. The comparison is not at fixed accuracy, and the ensemble's
+  members share their ImageNet starting weights.
 - **Deployment numbers are machine-specific.** The exported classifier's latency is
   measured on a laptop CPU, stated in `docs/RESULTS.md`, section *"8. Deployment"*; no
   drone or embedded computer was measured, and latency says nothing about the model's
@@ -210,8 +222,8 @@ Reproducing any specific number: [`docs/REPRODUCING.md`](docs/REPRODUCING.md).
                  │ scoutfield                          │
                  │  perception/  EfficientNet-B0,      │
                  │               temperature scaling   │
-                 │               (MC-dropout, ensembles│
-                 │                still to come)       │
+                 │               MC-dropout, ensembles │
+                 │               (stage 07)            │
                  │  envs/        FieldScoutEnv(ScoutEnv)│
                  │  planners/    PPO (SB3), oracle     │
                  │  analysis/    IQM + bootstrap CIs   │
@@ -333,9 +345,9 @@ Ordered by dependency. Each item names how you know it is done. ✅ done, result
 | 4 | `FieldScoutEnv`: 32×32, ≤40% coverage, global belief map | coverage ceiling verified empirically; obs dimension asserted in a test | ✅ |
 | 5 | PPO to convergence | curve plateaus over ≥3 seeds; beats or loses to lawnmower with a stated reason | ✅ |
 | 6 | τ sensitivity | effect size reported as a curve over τ, not a single number | ✅ |
-| 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis | ◐ |
+| 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis | ✅ |
 | 8 | Oracle planner; regret | every planner's gap to the ground-truth ceiling quantified | ✅ |
-| 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated | ◐ demonstration live at <https://scoutfield.streamlit.app/>; Cloud Run copy not yet deployed |
+| 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated | ✅ demonstration live at <https://scoutfield.streamlit.app/> |
 
 **Standing risks.** Reward shaping can consume weeks — the reward is frozen and swept only
 if a result demands it. Simulator realism will be challenged in review, so every physical

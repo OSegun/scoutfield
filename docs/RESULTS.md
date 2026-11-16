@@ -3,7 +3,7 @@
 **Run `r2026-11-13`.** Every number below is read from the files in `results/`, which
 are copies of that run's final outputs in the public artefact store.
 `results/RUN.json` names the store revision they were taken from
-(`699392734c937bcb827d99dff3244523fbf6d43d`) and lists each file with its SHA-256. If a
+(`a966683c1c7fba5bebb91e981e3c80061e1f260e`) and lists each file with its SHA-256. If a
 number here disagrees with those files, this file is wrong.
 
 Rounding: detections per joule and calibration errors to 4 decimal places, rates
@@ -315,11 +315,76 @@ compared here; the magnitudes are not expected to match.
 
 ## 7. Uncertainty methods
 
-Roadmap item 7. **Not run in this release.** MC-dropout and deep ensembles were not
-evaluated for run `r2026-11-13`, so there is no comparison with temperature scaling and
-Figure 16 is not drawn. Reliability data at the fitted temperature for every split is
-in `results/calibration_sweep.json` (`reliability_at_fitted`); Figure 9 draws it for
-PlantDoc `shift_eval` under both temperatures.
+Roadmap item 7. Read from `results/uncertainty_comparison.json` and
+`results/member1_summary.json` to `results/member4_summary.json`; the method is in
+`docs/METHOD.md`, section *"2. Perception"*, subsection *"Uncertainty methods"*. Three
+methods are compared on the same images: temperature scaling (the stage 01 classifier),
+MC-dropout (the same classifier, 30 draws with its head's dropout on) and a five-member
+deep ensemble (the stage 01 classifier and four members fine-tuned with seeds 1 to 4).
+Each is scored raw and with its own temperature, fitted on `shift_fit` for `shift_eval`
+and on `val` for `test`.
+
+**The comparison looks at the run's classifier.** Recomputed here, temperature scaling
+reproduced stage 02 on `shift_eval`: shift-fitted temperature 3.3843 (difference
+1.16e-07), ECE at that temperature 0.0145 (difference 1.91e-09), accuracy 0.8070
+(identical), all within the 1e-3 tolerance.
+
+**Ensemble members.** Each new member was fine-tuned as stage 01 was, on the same split.
+
+| Member | Seed | Best epoch | PlantVillage `test` accuracy | PlantDoc `shift_eval` accuracy |
+| --- | --- | --- | --- | --- |
+| 0 (stage 01) | 0 | 7 | 0.9995 | 0.8070 |
+| 1 | 1 | 10 | 0.9996 | 0.7967 |
+| 2 | 2 | 9 | 0.9996 | 0.7947 |
+| 3 | 3 | 10 | 0.9994 | 0.8090 |
+| 4 | 4 | 11 | 0.9995 | 0.7995 |
+
+The members agree on lab imagery and differ by up to 0.0143 in accuracy on field
+imagery.
+
+**PlantDoc `shift_eval`** (1,461 images; raw / with the method's own fitted
+temperature):
+
+| Method | Accuracy | Fitted temperature | ECE | Signed error | NLL | Brier |
+| --- | --- | --- | --- | --- | --- | --- |
+| Temperature scaling | 0.8070 | 3.3843 | 0.1274 / 0.0145 | +0.1246 / −0.0020 | 0.7200 / 0.4242 | 0.1576 / 0.1361 |
+| MC-dropout | 0.8049 | 3.3079 | 0.1246 / 0.0137 | +0.1238 / −0.0008 | 0.7039 / 0.4241 | 0.1569 / 0.1362 |
+| Deep ensemble | 0.8022 | 3.1784 | 0.1178 / 0.0238 | +0.1178 / −0.0030 | 0.6810 / 0.4285 | 0.1532 / 0.1373 |
+
+Raw, all three are overconfident on field imagery by a similar margin (signed error
++0.1178 to +0.1246); the ensemble is the least so. Neither MC-dropout nor the ensemble
+removes the overconfidence on its own: each still needs a fitted temperature near 3.2
+to 3.3, close to the one temperature scaling fits. With that temperature, MC-dropout
+and temperature scaling end within 0.0008 ECE of each other, and the ensemble ends
+worse on ECE (0.0238) and NLL (0.4285) than both. Accuracy differs by method (0.8022
+to 0.8070): averaging draws or members moved some predictions across the boundary, so
+this comparison is not at fixed accuracy.
+
+**Spread on `shift_eval`.** Mean predictive variance on wrong predictions against
+right ones:
+
+| Method | Right | Wrong | Wrong ÷ right | Right / wrong predictions |
+| --- | --- | --- | --- | --- |
+| MC-dropout | 0.0013 | 0.0039 | 2.90 | 1,176 / 285 |
+| Deep ensemble | 0.0039 | 0.0123 | 3.14 | 1,172 / 289 |
+
+For both, the variance is about three times larger on wrong predictions than on right
+ones, so it carries information the probability alone does not. Temperature scaling
+has no such output.
+
+**PlantVillage `test`** (8,150 images, the in-distribution control): accuracy 0.9995
+(temperature scaling, MC-dropout) and 0.9996 (ensemble); ECE 0.0006, 0.0006 and 0.0005
+raw, unchanged by the fitted temperature to 4 decimal places. On lab imagery the
+methods are indistinguishable at this resolution: 4, 4 and 3 images are wrong.
+
+Figure 16 draws each method's reliability with its fitted temperature on `shift_eval`,
+and the ECE of all three raw and fitted.
+
+**Limits.** Not at fixed accuracy (above). Not a planner comparison: the planners were
+flown on temperature-scaled logits only, so whether MC-dropout or the ensemble would
+change where a drone flies is not measured. The members share their ImageNet starting
+weights, which limits how far they can disagree. The deployed ONNX model runs with
+dropout off, so MC-dropout is not available in the demonstration.
 
 ---
 
@@ -372,6 +437,7 @@ All in `figures/`, drawn by `experiments/make_figures.py` from the files above.
 | 13 | Detections per joule against `T`, every planner, with intervals |
 | 14 | τ sensitivity of the underconfident-span ratio |
 | 15 | Regret against the oracle at every `T` |
+| 16 | Temperature scaling, MC-dropout and the deep ensemble on `shift_eval`: reliability with each method's fitted temperature, and ECE raw and fitted |
 
 ---
 

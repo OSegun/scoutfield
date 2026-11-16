@@ -1,17 +1,18 @@
 {
   "run_id": "r2026-11-13",
   "store": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts",
-  "store_revision": "fa19b05b0584b411c6fcd8f90ca32b7bb5d5f793",
-  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/fa19b05b0584b411c6fcd8f90ca32b7bb5d5f793/runs/r2026-11-13",
-  "promoted_at": "2026-11-16T14:18:40+00:00",
-  "promoted_by_commit": "cde47de3834d125d29ba2f5c3868568b0104c1a5",
+  "store_revision": "a966683c1c7fba5bebb91e981e3c80061e1f260e",
+  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/a966683c1c7fba5bebb91e981e3c80061e1f260e/runs/r2026-11-13",
+  "promoted_at": "2026-11-16T17:59:05+00:00",
+  "promoted_by_commit": "1cb3aae658f61e402f23fb498c9c4935a4c44a0f",
   "stage_commits": {
     "01_perception": "193ec3f779f0c3d37ed1c29ce5be160609853751",
     "02_calibration": "193ec3f779f0c3d37ed1c29ce5be160609853751",
     "03_ppo": "184c3c56c902cd58bf28911a2c61a919a18d58bd",
     "04_sweep": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
     "05_tau": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
-    "06_figures": "c2f0b92fc4f787188d9f3434754502688ef315b4",
+    "06_figures": "1cb3aae658f61e402f23fb498c9c4935a4c44a0f",
+    "07_uncertainty": "1cb3aae658f61e402f23fb498c9c4935a4c44a0f",
     "08_deployment": "cde47de3834d125d29ba2f5c3868568b0104c1a5"
   },
   "files": [
@@ -118,10 +119,46 @@
       "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
     },
     {
+      "path": "figures/Figure16_Uncertainty_Method_Comparison.png",
+      "stage": "06_figures",
+      "sha256": "a3d3edd1347368ea8d5cc20b014eb57c5d018f24e29d86c20e48938bda9ad41f",
+      "store_commit": "3d590797b43a544dfe70b72c1ef0f888e3b6918a"
+    },
+    {
       "path": "figures/Figure9_Perception_Calibration_Under_Shift.png",
       "stage": "06_figures",
       "sha256": "d4eb9898f8214d207d417560c771b036a6d57ca3eff527a4aa88162610368f00",
       "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
+    },
+    {
+      "path": "results/member1_summary.json",
+      "stage": "07_uncertainty",
+      "sha256": "d4b0d3c7edd91148f050d59da8dc6b015b6ebb8d767c45adb42040bb5f2ced4d",
+      "store_commit": "59e170bfcb3cc997850d4e2d3f4140991358f698"
+    },
+    {
+      "path": "results/member2_summary.json",
+      "stage": "07_uncertainty",
+      "sha256": "af6cec5f919e9823f8519ec5f0bff22b1d808a9bc49e73f2c84a2b2be78f7d2a",
+      "store_commit": "3af0a00434eed52ab817e82df448f502f305bad9"
+    },
+    {
+      "path": "results/member3_summary.json",
+      "stage": "07_uncertainty",
+      "sha256": "313b81b1c66f37d80e49030e15241aba4aa4073c8f80153de9ca493432bde1f8",
+      "store_commit": "85dac59c9aa37dcd8341d2ac39963d37df6c931a"
+    },
+    {
+      "path": "results/member4_summary.json",
+      "stage": "07_uncertainty",
+      "sha256": "2bb89ebf0a0eb3027b8f015aaecb346b613f11b755705466a5366888ff232096",
+      "store_commit": "c021f127fb273b07c4f016dbfaa0fb04de7eeb2b"
+    },
+    {
+      "path": "results/uncertainty_comparison.json",
+      "stage": "07_uncertainty",
+      "sha256": "11a1ce8cf03bd7f1358e3fc06d2c60c4fd641fcc8f89c41eec942d3ec1c8f760",
+      "store_commit": "08cfe8793031a9886d95f98e77f048c2d71a81a8"
     },
     {
       "path": "results/demo_logit_check.json",

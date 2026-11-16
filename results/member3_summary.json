@@ -1,0 +1,225 @@
+{
+  "accuracy": 0.9993865030674847,
+  "accuracy_shift": 0.8069815195071869,
+  "accuracy_shift_eval": 0.8090349075975359,
+  "ece": 0.000488950110532409,
+  "ece_shift": 0.12350924096036527,
+  "signed_calibration_error": -0.00016813163372110233,
+  "signed_calibration_error_shift": 0.12350924096036527,
+  "lab_fitted_temperature": 0.9976982535154029,
+  "best_epoch": 10,
+  "history": [
+    {
+      "epoch": 0,
+      "train_loss": 0.3154307493662101,
+      "test_accuracy": 0.9390184049079755,
+      "test_ece": 0.07300923819053541,
+      "val_ece": 0.07666693011372767,
+      "val_accuracy": 0.9419204322200393,
+      "lr": [
+        2.9488887394336025e-05,
+        0.0002948888739433602
+      ]
+    },
+    {
+      "epoch": 1,
+      "train_loss": 0.0562840535359025,
+      "test_accuracy": 0.9959509202453988,
+      "test_ece": 0.0036384634570070275,
+      "val_ece": 0.0049580849376128,
+      "val_accuracy": 0.9968074656188605,
+      "lr": [
+        2.7990381056766583e-05,
+        0.0002799038105676658
+      ]
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.01679255719767024,
+      "test_accuracy": 0.9979141104294479,
+      "test_ece": 0.0014250977032086013,
+      "val_ece": 0.002045039186212103,
+      "val_accuracy": 0.9987721021611002,
+      "lr": [
+        2.5606601717798212e-05,
+        0.00025606601717798207
+      ]
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.009866950747120603,
+      "test_accuracy": 0.9985276073619632,
+      "test_ece": 0.0011460258975336593,
+      "val_ece": 0.0014855653636958578,
+      "val_accuracy": 0.9988948919449901,
+      "lr": [
+        2.25e-05,
+        0.00022499999999999997
+      ]
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.006929391580263725,
+      "test_accuracy": 0.9988957055214724,
+      "test_ece": 0.0006856989474925391,
+      "val_ece": 0.0007721054688207361,
+      "val_accuracy": 0.9990176817288802,
+      "lr": [
+        1.888228567653781e-05,
+        0.0001888228567653781
+      ]
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.005290563989097251,
+      "test_accuracy": 0.9990184049079754,
+      "test_ece": 0.0006872833283336738,
+      "val_ece": 0.0007506157077996076,
+      "val_accuracy": 0.99950884086444,
+      "lr": [
+        1.5e-05,
+        0.00015
+      ]
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.004355550717249934,
+      "test_accuracy": 0.9992638036809816,
+      "test_ece": 0.0007767887285036196,
+      "val_ece": 0.0006790296810853292,
+      "val_accuracy": 0.99950884086444,
+      "lr": [
+        1.1117714323462191e-05,
+        0.0001111771432346219
+      ]
+    },
+    {
+      "epoch": 7,
+      "train_loss": 0.003999504022638755,
+      "test_accuracy": 0.9992638036809816,
+      "test_ece": 0.00040500983078577233,
+      "val_ece": 0.00046657397133387593,
+      "val_accuracy": 0.9993860510805501,
+      "lr": [
+        7.500000000000004e-06,
+        7.500000000000003e-05
+      ]
+    },
+    {
+      "epoch": 8,
+      "train_loss": 0.0033098946022080146,
+      "test_accuracy": 0.9992638036809816,
+      "test_ece": 0.0005696053375984005,
+      "val_ece": 0.0009059031419661551,
+      "val_accuracy": 0.9992632612966601,
+      "lr": [
+        4.393398282201788e-06,
+        4.393398282201788e-05
+      ]
+    },
+    {
+      "epoch": 9,
+      "train_loss": 0.003026795029060256,
+      "test_accuracy": 0.9990184049079754,
+      "test_ece": 0.0006747120700916655,
+      "val_ece": 0.000728817336469318,
+      "val_accuracy": 0.9993860510805501,
+      "lr": [
+        2.0096189432334194e-06,
+        2.0096189432334194e-05
+      ]
+    },
+    {
+      "epoch": 10,
+      "train_loss": 0.0023681572784357867,
+      "test_accuracy": 0.9993865030674847,
+      "test_ece": 0.0004924093954551689,
+      "val_ece": 0.000445523025273007,
+      "val_accuracy": 0.9993860510805501,
+      "lr": [
+        5.11112605663977e-07,
+        5.1111260566397705e-06
+      ]
+    },
+    {
+      "epoch": 11,
+      "train_loss": 0.0023105592855136876,
+      "test_accuracy": 0.9992638036809816,
+      "test_ece": 0.0006337177799213522,
+      "val_ece": 0.0004999785304490106,
+      "val_accuracy": 0.99950884086444,
+      "lr": [
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "splits": {
+    "val": {
+      "n": 8144,
+      "n_classes": 38,
+      "healthy": 2233,
+      "diseased": 5911,
+      "diseased_fraction": 0.7258104125736738
+    },
+    "test": {
+      "n": 8150,
+      "n_classes": 38,
+      "healthy": 2242,
+      "diseased": 5908,
+      "diseased_fraction": 0.7249079754601226
+    },
+    "train": {
+      "n": 38011,
+      "n_classes": 38,
+      "healthy": 10609,
+      "diseased": 27402,
+      "diseased_fraction": 0.720896582568204
+    },
+    "shift": {
+      "n": 2922,
+      "n_classes": 28,
+      "healthy": 823,
+      "diseased": 2099,
+      "diseased_fraction": 0.7183436002737851
+    },
+    "shift_fit": {
+      "n": 1461,
+      "n_classes": 28,
+      "healthy": 411,
+      "diseased": 1050,
+      "diseased_fraction": 0.7186858316221766
+    },
+    "shift_eval": {
+      "n": 1461,
+      "n_classes": 28,
+      "healthy": 412,
+      "diseased": 1049,
+      "diseased_fraction": 0.7180013689253936
+    },
+    "roots": {
+      "train": [
+        "/kaggle/input/datasets/abdallahalidev/plantvillage-dataset/color"
+      ],
+      "shift": [
+        "/kaggle/input/datasets/nirmalsankalana/plantdoc-dataset/test",
+        "/kaggle/input/datasets/nirmalsankalana/plantdoc-dataset/train"
+      ]
+    },
+    "plantvillage_variant": "color",
+    "n_fine_classes": 66,
+    "membership": {
+      "val": "ae03b42a9eaf7dbedd921dda579bcf31c4810101c2fb11c7af3054579aa658a9",
+      "test": "62d48e90cb1471c2f9c17e0b29ca0d4349aa75894d88fde38266e8625a0f6627",
+      "train": "a3eb92b94d6d63d57fa2911b3bd2745ddfa03149443f4b1c295fc2eb0899b9e6",
+      "shift": "3b583005589e090ae194cf5d20183247dce6869ca56f479bc6da9738d6da3251",
+      "shift_fit": "c74d795c8114deef7090c609760219f4309c5c16761b583e9b021f7475397aea",
+      "shift_eval": "50162f4af94f9b44ae9a79500d2e6c3e0d0774e48f4b5013d2fb2c2d4cdeb084"
+    }
+  },
+  "config": "configs/perception.yaml",
+  "git_commit": "1cb3aae658f61e402f23fb498c9c4935a4c44a0f",
+  "seed": 3,
+  "member": 3,
+  "device": "cuda"
+}
