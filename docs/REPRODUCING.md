@@ -49,7 +49,8 @@ a resumed sweep treats two different runs as the same completed job and skips on
 | 3 | `python experiments/03_train_ppo.py --config configs/ppo_field32.yaml --seed <N>` | ~25 min per seed, GPU | `ppo_seed<N>.zip`, `ppo_seed<N>_resume.zip`, `ppo_curve_seed<N>.json` (stage `03_ppo`) |
 | 4 | `while JOB_BUDGET=60 python experiments/04_sweep.py --config configs/sweep.yaml; do :; done` | ~81 min for 735 jobs, CPU | `sweep_results.csv`, `summary.json`, `sweep_metadata.json` (stage `04_sweep`) |
 | 5 | `python experiments/05_tau_sensitivity.py --config configs/sweep.yaml` | ~2.5 h for 2610 jobs, CPU | `tau_sensitivity.csv`, `tau_sensitivity_summary.json` (stage `05_tau`) |
-| 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 needs the uncertainty comparison and is not drawn |
+| 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 once step 7 has run |
+| 7 | `python experiments/07_uncertainty.py train --member <k>` for k = 1 to 4, then `python experiments/07_uncertainty.py evaluate`, then `python experiments/make_figures.py --only 16` | about 40 min per member (step 1's time), GPU; not yet run | `member<k>_best.pt`, `member<k>_last.pt`, `member<k>_summary.json`, `uncertainty_comparison.json` (stage `07_uncertainty`); Figure 16 (stage `06_figures`) |
 | 8 | `python experiments/08_export_onnx.py` | under a minute, CPU, laptop | `classifier.onnx`, `export_record.json` in `.artifact_cache/deployment/<run_id>/`; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_measure_latency.py` | about a minute, CPU, laptop | `deployment_latency.json` beside the export; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_check_demo_logits.py` | under a minute, CPU, laptop | `demo_logit_check.json` beside the export; stage `08_deployment` only with `--push` |

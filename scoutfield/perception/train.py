@@ -62,7 +62,44 @@ class ResumeRefused(RuntimeError):
     """Resume state exists but resuming was not asked for."""
 
 
-def train(config, resume: bool = False, store=None) -> dict:
+def member_files(member: int) -> dict[str, str]:
+    """Store names of one deep-ensemble member's files (roadmap item 7)."""
+    return {"last": f"member{member}_last.pt", "best": f"member{member}_best.pt",
+            "summary": f"member{member}_summary.json"}
+
+
+def run_target(config, member: int | None = None) -> dict:
+    """Where a training run files its outputs, and the seed it trains with.
+
+    ``member=None`` is stage 01: ``best.pt``, ``last.pt`` and
+    ``perception_summary.json`` in ``01_perception``, trained with the top-level
+    ``seed``. ``member=k`` (1 to 4) is a deep-ensemble member: its own files in the
+    ``uncertainty.stage`` stage, trained with ``uncertainty.member_seeds[k - 1]``.
+    The PlantVillage split is drawn from the top-level ``seed`` either way
+    (``perception.datasets.index_and_split``), so every member sees the same split.
+    """
+    if member is None:
+        return {"stage": "01_perception", "seed": int(config["seed"]), "subdir": None,
+                "last": "last.pt", "best": "best.pt", "summary": "perception_summary.json"}
+    unc = config.section("uncertainty")
+    seeds = [int(s) for s in unc["member_seeds"]]
+    n_members = int(config.section("calibration")["ensemble_members"])
+    if 1 + len(seeds) != n_members:
+        raise ValueError(
+            f"uncertainty.member_seeds lists {len(seeds)} seeds, but "
+            f"calibration.ensemble_members is {n_members}: member 0 is stage 01's "
+            f"best.pt, so there must be {n_members - 1} member seeds")
+    if member not in range(1, len(seeds) + 1):
+        raise ValueError(f"member {member} does not exist; members 1 to {len(seeds)} "
+                         "are trained here, member 0 is 01_perception/best.pt")
+    if seeds[member - 1] == int(config["seed"]):
+        raise ValueError(f"member {member} would reuse the stage 01 seed "
+                         f"{config['seed']}, so it would repeat member 0")
+    return {"stage": str(unc["stage"]), "seed": seeds[member - 1], "subdir": "ensemble",
+            **member_files(member)}
+
+
+def train(config, resume: bool = False, store=None, member: int | None = None) -> dict:
     """Fine-tune and return a summary dict.
 
     The summary is written to ``results/perception_summary.json`` and pushed with
@@ -74,6 +111,9 @@ def train(config, resume: bool = False, store=None) -> dict:
     With ``resume=True`` training continues from that file. Without it, an
     existing ``last.pt`` in the store or on disk refuses the run: silently
     starting over would overwrite a partially trained model.
+
+    ``member=k`` trains deep-ensemble member ``k`` instead, with the same code,
+    hyperparameters and split, its own seed and its own files (``run_target``).
     """
     import torch
     from torch import nn
@@ -97,27 +137,30 @@ def train(config, resume: bool = False, store=None) -> dict:
     from scoutfield.utils.seeding import seed_everything
 
     store = store or get_store()
-    ckpt_dir = checkpoints_dir("perception")
-    last_path, best_path = ckpt_dir / "last.pt", ckpt_dir / "best.pt"
+    target = run_target(config, member)
+    stage = target["stage"]
+    ckpt_dir = (checkpoints_dir("perception", target["subdir"]) if target["subdir"]
+                else checkpoints_dir("perception"))
+    last_path, best_path = ckpt_dir / target["last"], ckpt_dir / target["best"]
     if not resume:
-        if store.has("01_perception", "last.pt") or last_path.exists():
+        if store.has(stage, target["last"]) or last_path.exists():
             raise ResumeRefused(
                 f"resume state already exists for run {store.run_id} "
-                f"(01_perception/last.pt in the store, or {last_path}). Pass --resume "
-                "(notebook 01: RESUME = True) to continue that run, or set a new "
-                "run_id in configs/artifacts.yaml to start a separate one."
+                f"({stage}/{target['last']} in the store, or {last_path}). Pass "
+                "--resume (notebook 01: RESUME = True) to continue that run, or set "
+                "a new run_id in configs/artifacts.yaml to start a separate one."
             )
     else:
         import shutil
 
-        pulled = store.pull("01_perception", "last.pt")
+        pulled = store.pull(stage, target["last"])
         ckpt_dir.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(pulled, last_path)
-        best = store.pull("01_perception", "best.pt", required=False)
+        best = store.pull(stage, target["best"], required=False)
         if best is not None:
             shutil.copyfile(best, best_path)
 
-    seed = int(config["seed"])
+    seed = target["seed"]
     seed_everything(seed)
 
     train_cfg = config.section("train")
@@ -234,9 +277,8 @@ def train(config, resume: bool = False, store=None) -> dict:
 
         # Pushed every epoch: a session that dies loses one epoch, not the run.
         if last_path.exists():
-            store.push("01_perception",
-                       [last_path, best_path] if improved else [last_path],
-                       f"epoch {epoch}")
+            label = f"epoch {epoch}" if member is None else f"member {member} epoch {epoch}"
+            store.push(stage, [last_path, best_path] if improved else [last_path], label)
 
     best_state = load_training_state(best_path)
     if best_state is not None:
@@ -274,15 +316,17 @@ def train(config, resume: bool = False, store=None) -> dict:
         "config": str(config.path),
         "git_commit": git_commit(),
         "seed": seed,
+        "member": member,
         "device": device,
     }
 
-    out = results_dir() / "perception_summary.json"
+    out = results_dir() / target["summary"]
     with out.open("w", encoding="utf-8") as fh:
         json.dump(summary, fh, indent=2, default=lambda o: o.tolist()
                   if isinstance(o, np.ndarray) else str(o))
     print(f"wrote {out}  (repo root {repo_root()})")
-    store.push("01_perception", [best_path, last_path, out], "fine-tune complete")
+    store.push(stage, [best_path, last_path, out],
+               "fine-tune complete" if member is None else f"member {member} complete")
     return summary
 
 

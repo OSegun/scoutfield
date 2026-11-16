@@ -200,7 +200,7 @@ condition, and its accuracy is not BASE_ACC.
 | Sweeps written | `val`, `test` relative to lab; `shift_eval` relative to shift; `shift_eval` relative to lab | the third is the planner condition, the fourth the lab-calibrated one |
 | ECE bins | 15, equal-width | matches the pilot's convention. Two ECE implementations with different binning give different numbers; comparing this phase's ECE to the pilot's 0.0037 / 0.1980 only means something if both were computed the same way — so import the pilot's implementation rather than rewriting it. |
 | MC-dropout samples | 30 | diminishing returns beyond ~30 for a single dropout layer |
-| Ensemble members | 5 | ~10 GPU-minutes each is affordable within a weekly quota; more is not. State the constraint rather than leaving the choice unexplained. Members must differ in initialisation *and* data order — ensembling checkpoints that differ only in data order understates real ensemble diversity. |
+| Ensemble members | 5 | each member is a full stage 01 fine-tune, about 40 GPU-minutes on Kaggle's T4 (step 1 of run `r2026-11-13`), so four new members cost about 2.7 GPU-hours; more would take a large share of a weekly quota. Members must differ in initialisation *and* data order — ensembling checkpoints that differ only in data order understates real ensemble diversity. |
 
 Beyond ECE, report **signed** calibration error. ECE takes an absolute value and discards
 the sign, and the pilot's refuted hypothesis H2 is precisely a finding about direction
@@ -222,6 +222,37 @@ metrics (`scoutfield/perception/metrics.py`, written to `calibration_sweep.json`
 
 Confidence, in ECE and its relatives, is the probability of the *predicted* class, as in
 the pilot.
+
+### Uncertainty methods
+
+Roadmap item 7 compares three ways for the classifier to state how sure it is, on one
+axis (`experiments/07_uncertainty.py`, `scoutfield/perception/uncertainty.py`, settings
+under `uncertainty` in `configs/perception.yaml`, stage `07_uncertainty`).
+
+| Method | What gives the probability | Second output |
+| --- | --- | --- |
+| Temperature scaling (Guo et al., 2017) | stage 01's `best.pt`, its logit divided by one fitted scalar | none |
+| MC-dropout (Gal & Ghahramani, 2016) | the same classifier with the head's dropout (p = 0.3) left on: mean probability over 30 seeded draws | variance across the draws |
+| Deep ensemble (Lakshminarayanan et al., 2017) | five classifiers fine-tuned with the stage 01 recipe: mean of their probabilities | variance across the members |
+
+| Element | Rule | Why |
+| --- | --- | --- |
+| Ensemble members | member 0 is stage 01's `best.pt` (seed 0); members 1 to 4 are fine-tuned with seeds 1 to 4 (`uncertainty.member_seeds`) | the same code, hyperparameters, early-stopping rule and number of epochs as stage 01, so the members differ only by seed |
+| What a member seed changes | the head's initial weights, the order of the training data and the augmentation draws | the PlantVillage split is drawn from the top-level `seed` alone, so every member trains and stops on the same images; a test holds this |
+| Backbone start | the same ImageNet weights in every member | as in any fine-tuned ensemble; it limits how much the members can disagree, and is stated as a limitation |
+| MC-dropout draws | the head's only dropout layer applied to backbone features computed once per image, from a generator seeded with `uncertainty.mc_dropout_seed` | identical to 30 full forward passes with dropout on, at a thirtieth of the cost, and reproducible |
+| Scored splits | PlantDoc `shift_eval`, the planners' split; PlantVillage `test` as the in-distribution control | the comparison sits where the planners fly |
+| Raw and fitted | each method scored raw, and after its own temperature is fitted by the stage 02 NLL fit: on `shift_fit` for `shift_eval`, on `val` for `test` | temperature scaling is otherwise the only method fitted on field imagery, which would favour it |
+| Metrics | those of the table above, plus, for MC-dropout and the ensemble, mean variance on right and on wrong predictions | variance that is larger on wrong predictions carries information the probability alone does not |
+| Consistency with stage 02 | temperature scaling here must reproduce stage 02's shift-fitted temperature, `shift_eval` ECE and accuracy within 1e-3 (`uncertainty.consistency_atol`), or the stage stops | member 0 must be the classifier the rest of the run used |
+
+Two limits are stated with every result of this comparison. It is **not at fixed
+accuracy**: averaging draws or members can move predictions near the boundary, so each
+method reports its own accuracy, whereas the temperature sweep holds accuracy fixed
+within one method. And it is **not a planner comparison**: the planners were flown on
+temperature-scaled logits only, so whether MC-dropout or an ensemble would change where
+a drone flies is not measured. The exported ONNX model serves point estimates with
+dropout off, so MC-dropout is not available in the deployed demonstration.
 
 ### The logit pool, and its one limitation
 
@@ -581,10 +612,15 @@ The run's final CSV, JSON and figure files are also copied into `results/` and
   comparisons of reinforcement learning algorithms. *arXiv:1904.06979*.
 - Frenkel, L., & Goldberger, J. (2022). Calibration of medical imaging classification
   systems with weight scaling. *MICCAI 2022*.
+- Gal, Y., & Ghahramani, Z. (2016). Dropout as a Bayesian approximation: Representing
+  model uncertainty in deep learning. *ICML 2016*. https://arxiv.org/abs/1506.02142
 - Guo, C., Pleiss, G., Sun, Y., & Weinberger, K. Q. (2017). On calibration of modern
   neural networks. *ICML 34*.
 - Heck, D. W., et al. (2021). Spatial pattern analysis of plant disease epidemics.
   *Phytopathology*.
+- Lakshminarayanan, B., Pritzel, A., & Blundell, C. (2017). Simple and scalable
+  predictive uncertainty estimation using deep ensembles. *NIPS 2017*.
+  https://arxiv.org/abs/1612.01474
 - Schulman, J., Wolski, F., Dhariwal, P., Radford, A., & Klimov, O. (2017). Proximal
   policy optimization algorithms. *arXiv:1707.06347*.
 - Singh, D., Jain, N., Jain, P., Kayal, P., Kumawat, S., & Batra, N. (2020). PlantDoc: A

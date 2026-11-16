@@ -1,0 +1,17 @@
+{
+  "id": "odusinaoluwasegun/scoutfield-07-uncertainty-methods",
+  "title": "scoutfield 07 Uncertainty Methods",
+  "code_file": "07_uncertainty_methods.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": "false",
+  "enable_gpu": "true",
+  "enable_tpu": "false",
+  "enable_internet": "true",
+  "dataset_sources": [
+    "abdallahalidev/plantvillage-dataset",
+    "nirmalsankalana/plantdoc-dataset"
+  ],
+  "competition_sources": [],
+  "model_sources": []
+}

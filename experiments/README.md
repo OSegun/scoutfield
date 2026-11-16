@@ -18,6 +18,7 @@ Inputs and outputs are files in the artefact store (`configs/artifacts.yaml`), b
 | `04_sweep.py` | 8 | `02_calibration`, `03_ppo` | `sweep_results.csv`, `summary.json`, `sweep_metadata.json` (`04_sweep`) |
 | `05_tau_sensitivity.py` | 6 | `02_calibration` | `tau_sensitivity.csv`, `tau_sensitivity_summary.json` (`05_tau`) |
 | `make_figures.py` | — | stages 02–05 | Figures 9–15 (`06_figures`) |
+| `07_uncertainty.py` | 7 | `01_perception/best.pt`, both datasets; then the four members and `02_calibration` | `member<k>_best.pt`, `member<k>_last.pt`, `member<k>_summary.json`, `uncertainty_comparison.json` (`07_uncertainty`) |
 | `08_export_onnx.py` | 9 | `01_perception/best.pt` | `classifier.onnx`, `export_record.json` (local; `08_deployment` with `--push`) |
 | `08_measure_latency.py` | 9 | the exported `classifier.onnx` | `deployment_latency.json` (local; `08_deployment` with `--push`) |
 | `08_check_demo_logits.py` | 9 | the exported `classifier.onnx`, `08_deployment` samples, local PlantVillage samples if present | `demo_logit_check.json` (local; `08_deployment` with `--push`) |

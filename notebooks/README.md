@@ -25,7 +25,8 @@ notebooks/
 ├── 01_perception_finetune/      EfficientNet-B0 on PlantVillage        [GPU]
 ├── 02_calibration_shift/        temperature fit, sweep, PlantDoc shift [GPU]
 ├── 03_ppo_training/             PPO on the 32x32 field                 [GPU]
-└── 04_evaluation_sweep/         full sweep + figures                   [CPU]
+├── 04_evaluation_sweep/         full sweep + figures                   [CPU]
+└── 07_uncertainty_methods/      ensemble members, MC-dropout, Fig. 16  [GPU]
 ```
 
 ## Sync

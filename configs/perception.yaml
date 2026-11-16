@@ -74,3 +74,33 @@ calibration:
   ece_bins: 15
   mc_dropout_samples: 30
   ensemble_members: 5
+
+# Roadmap item 7: temperature scaling, MC-dropout and a deep ensemble compared on
+# one axis. Run by experiments/07_uncertainty.py; described in docs/METHOD.md,
+# section "2. Perception", subsection "Uncertainty methods".
+uncertainty:
+  # Every file of this comparison: the extra members' checkpoints and the results.
+  # Same run as stage 01, because member 0 is that run's best.pt.
+  stage: 07_uncertainty
+  # Training seeds of members 1 to 4; member 0 is 01_perception/best.pt (top-level
+  # `seed`). A member seed changes the head's initial weights, the order of the
+  # training data and the augmentation draws. It never changes the PlantVillage
+  # split, which stays drawn with the top-level `seed`, so every member trains,
+  # stops and is evaluated on the same images. The backbone starts from the same
+  # ImageNet weights in every member, as in any fine-tuned ensemble; that limits
+  # member diversity and is stated as a limitation. 1 + len(member_seeds) must equal
+  # calibration.ensemble_members.
+  member_seeds: [1, 2, 3, 4]
+  # MC-dropout draws are seeded so the comparison reproduces exactly.
+  mc_dropout_seed: 0
+  # Each method is reported raw and after its own temperature is fitted by the same
+  # NLL fit as stage 02, so no method is favoured by being the only one fitted.
+  # Scored split: the split its temperature is fitted on. shift_eval (what the
+  # planners are scored on) pairs with shift_fit; the lab test split, the
+  # in-distribution control, pairs with val, as in stage 02.
+  fit_splits: {shift_eval: shift_fit, test: val}
+  # Stage 02's shift-fitted temperature and shift_eval ECE are recomputed here from
+  # member 0. A larger difference stops the stage: it would mean this comparison is
+  # not looking at the classifier the rest of the run used.
+  consistency_atol: 1.0e-3
+  results_file: uncertainty_comparison.json

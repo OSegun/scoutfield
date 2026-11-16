@@ -3,9 +3,10 @@ Regenerate every figure from the run's results in the artefact store.
 
     python experiments/make_figures.py
 
-Inputs are pulled from stages 02 to 05 of the run named in ``configs/artifacts.yaml``;
-Figures 9 to 15 are pushed to stage ``06_figures``. Figure 16 needs the optional
-uncertainty-method comparison and is drawn only when that exists.
+Inputs are pulled from stages 02 to 05 and 07 of the run named in
+``configs/artifacts.yaml``; every figure is pushed to stage ``06_figures``. Figure 16
+needs the uncertainty-method comparison of stage 07 (``experiments/07_uncertainty.py``)
+and is drawn only when that exists, or fails if asked for with ``--only 16`` without it.
 
 Rules inherited from the pilot, and why each exists
 ----------------------------------------------------
@@ -343,6 +344,51 @@ def figure_15_regret(summary, plt) -> Path:
     return _save(fig, 15)
 
 
+def figure_16_uncertainty_methods(comparison, plt) -> Path:
+    """Three uncertainty methods on PlantDoc shift_eval, on one axis.
+
+    Panels 1-3: each method's reliability with its own fitted temperature, the
+    condition the planners would meet. Panel 4: ECE raw and fitted for all three,
+    so the effect of the post-hoc fit is visible beside the method itself.
+    """
+    from scoutfield.perception.uncertainty import LABELS, METHODS
+
+    fig, axes = plt.subplots(1, 4, figsize=(15, 4),
+                             gridspec_kw={"width_ratios": [1, 1, 1, 1.15]})
+    for ax, name in zip(axes[:3], METHODS):
+        row = comparison["methods"][name]["shift_eval"]
+        rel = row["reliability_fitted"]
+        width = 1.0 / rel["bins"]
+        ax.bar(rel["bin_centre"], rel["accuracy"], width=width * 0.9,
+               color=PALETTE["moss"], edgecolor=PALETTE["forest"], label="accuracy")
+        ax.plot([0.5, 1.0], [0.5, 1.0], linestyle="--", color=PALETTE["muted"],
+                linewidth=1, label="perfect calibration")
+        fitted = row["fitted"]
+        ax.set_title(f"{LABELS[name]}\n(T* = {row['fitted_temperature']:.3f}, "
+                     f"ECE {fitted['ece']:.4f}, acc. {fitted['accuracy']:.4f})", fontsize=9)
+        ax.set_xlabel("confidence")
+        ax.set_xlim(0.5, 1.0)
+        ax.set_ylim(0.0, 1.0)
+    axes[0].set_ylabel("accuracy")
+    axes[0].legend(frameon=False, fontsize=8)
+
+    ax = axes[3]
+    x = np.arange(len(METHODS))
+    raw = [comparison["methods"][m]["shift_eval"]["raw"]["ece"] for m in METHODS]
+    fit = [comparison["methods"][m]["shift_eval"]["fitted"]["ece"] for m in METHODS]
+    ax.bar(x - 0.2, raw, width=0.4, color=PALETTE["tint2"], edgecolor=PALETTE["forest"],
+           label="raw")
+    ax.bar(x + 0.2, fit, width=0.4, color=PALETTE["forest"], label="own fitted T")
+    ax.set_xticks(x)
+    ax.set_xticklabels([LABELS[m] for m in METHODS], fontsize=8)
+    ax.set_ylabel("ECE, shift_eval")
+    ax.set_title("ECE raw and with each method's fitted temperature", fontsize=9)
+    ax.legend(frameon=False, fontsize=8)
+    fig.suptitle("Uncertainty methods under shift, PlantDoc shift_eval", fontsize=11)
+    fig.tight_layout()
+    return _save(fig, 16)
+
+
 def check_same_commit(store, stage: str, names: list[str]) -> None:
     """Refuse to draw from files of one stage that were not pushed together.
 
@@ -389,10 +435,21 @@ def make_all(only: list[int] | None = None, store=None) -> list[Path]:
         written.append(figure_14_tau_surface(
             store.pull_json("05_tau", "tau_sensitivity_summary.json"), plt))
     if 16 in wanted:
-        print("  Figure 16 needs the uncertainty-method comparison (stage 07); not drawn")
+        cfg = load_config("configs/perception.yaml").section("uncertainty")
+        stage, name = str(cfg["stage"]), str(cfg["results_file"])
+        if store.has(stage, name):
+            written.append(figure_16_uncertainty_methods(store.pull_json(stage, name), plt))
+        elif only and 16 in only:
+            raise FileNotFoundError(
+                f"Figure 16 asked for, but {stage}/{name} is not in run {store.run_id}. "
+                "Run `python experiments/07_uncertainty.py evaluate` first.")
+        else:
+            print(f"  Figure 16 needs {stage}/{name} (experiments/07_uncertainty.py); "
+                  "not drawn")
 
     if written:
-        store.push("06_figures", written, f"figures {sorted(wanted - {16})}")
+        numbers = sorted(int(p.name.split("_")[0][len("Figure"):]) for p in written)
+        store.push("06_figures", written, f"figures {numbers}")
         store.record_inputs("06_figures")
     return written
 

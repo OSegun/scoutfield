@@ -162,21 +162,86 @@ def sweep_temperature(logits, labels, temperatures: list[float], bins: int = 15)
     return result
 
 
-def mc_dropout_predict(model, loader, n_samples: int = 30, device=None):
+def collect_features(model, loader, device=None):
+    """The head's input for every image: ``(features, binary, fine)``.
+
+    The classifier's only dropout layer is the first layer of the head
+    (``perception.model.BinaryClassifier``); everything before it is deterministic
+    in eval mode. So the backbone runs once per image, and MC-dropout draws are
+    taken on these features, which gives exactly the draws a full forward pass
+    with dropout active would give, at a thirtieth of the cost.
+    """
+    import torch
+
+    from scoutfield.utils.device import select_device
+
+    device = select_device(device)
+    model = model.to(device).eval()
+    net = model.backbone
+    feats, binary, fine = [], [], []
+    with torch.no_grad():
+        for x, y, y_fine in loader:
+            f = torch.flatten(net.avgpool(net.features(x.to(device, non_blocking=True))), 1)
+            feats.append(f.float().cpu())
+            binary.append(np.asarray(y).ravel())
+            fine.append(np.asarray(y_fine).ravel())
+    return (torch.cat(feats),
+            np.concatenate(binary).astype(int),
+            np.concatenate(fine).astype(int))
+
+
+def mc_dropout_logits(model, features, n_samples: int = 30, seed: int = 0) -> np.ndarray:
+    """``n_samples`` stochastic logits per image, shape ``(n_samples, n_images)``.
+
+    The head's dropout is applied on features from ``collect_features`` exactly as
+    ``nn.Dropout`` applies it in training mode (keep each feature with probability
+    1 - p, scale the kept ones by 1 / (1 - p)), and the head's other layers run as
+    in eval mode. Draws come from a generator seeded with ``seed``, so they
+    reproduce exactly. An earlier version called ``collect_logits`` for each draw,
+    which puts the model back in eval mode and so switched dropout off again: every
+    draw was the same. ``tests/test_uncertainty.py`` guards against that.
+    """
+    import copy
+
+    import torch
+
+    # A CPU copy, so the model itself is neither moved nor left in a changed mode.
+    head = copy.deepcopy(model.backbone.classifier).to("cpu").eval()
+    dropouts = [m for m in head if isinstance(m, torch.nn.Dropout)]
+    if len(dropouts) != 1 or float(dropouts[0].p) <= 0.0:
+        raise RuntimeError(
+            f"MC-dropout needs exactly one dropout layer with p > 0 in the head; found "
+            f"{[float(m.p) for m in dropouts]}. Without it every draw would be the same.")
+    dropout = dropouts[0]
+    if head[0] is not dropout:
+        raise RuntimeError("MC-dropout here assumes the head's first layer is its "
+                           "dropout, so the mask applies to the backbone features")
+    generator = torch.Generator().manual_seed(int(seed))
+    keep = 1.0 - float(dropout.p)
+    draws = []
+    with torch.no_grad():
+        for _ in range(int(n_samples)):
+            # The same operation nn.Dropout performs, with an explicit generator so
+            # the draws do not depend on anything else that used the global RNG.
+            mask = torch.bernoulli(torch.full(features.shape, keep), generator=generator)
+            dropped = features * mask / keep
+            out = dropped
+            for layer in head:
+                if layer is not dropout:
+                    out = layer(out)
+            draws.append(out.squeeze(-1).numpy().astype(float))
+    return np.stack(draws)
+
+
+def mc_dropout_predict(model, loader, n_samples: int = 30, device=None, seed: int = 0):
     """Predictive mean and variance under MC-dropout.
 
     Reports both the mean probability (comparable to the temperature-scaled
     probability) and the variance, which temperature scaling cannot produce at
     all — that difference is the reason for comparing the methods.
     """
-    from scoutfield.perception.model import enable_mc_dropout
-
-    enable_mc_dropout(model)
-    draws = []
-    for _ in range(n_samples):
-        z, labels, fine = collect_logits(model, loader, device=device)
-        draws.append(sigmoid(z))
-    probs = np.stack(draws)
+    features, labels, fine = collect_features(model, loader, device=device)
+    probs = sigmoid(mc_dropout_logits(model, features, n_samples, seed))
     return {
         "mean": probs.mean(axis=0),
         "variance": probs.var(axis=0),
