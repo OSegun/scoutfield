@@ -1,0 +1,53 @@
+{
+  "run_id": "r2026-11-13",
+  "exported_at": "2026-11-14T15:52:26+00:00",
+  "checkpoint": {
+    "source": "store runs/r2026-11-13/03_ppo/ppo_seed0.zip",
+    "sha256": "2142b85473e7dfc49ebcf9126ac7a25825a4bfe69d179bc6b14dae40925114c6"
+  },
+  "onnx": {
+    "file": "policy_ppo_seed0.onnx",
+    "sha256": "c2e202db2f37ede1ad56245ca1564887a18d01ad98badbf736dedc61620ea23c",
+    "bytes": 493817,
+    "opset": 18,
+    "input": {
+      "name": "observation",
+      "shape": [
+        "batch",
+        206
+      ],
+      "dtype": "float32"
+    },
+    "output": {
+      "name": "action_scores",
+      "shape": [
+        "batch",
+        8
+      ],
+      "dtype": "float32",
+      "meaning": "actor score per action; the deterministic action is the arg-max"
+    }
+  },
+  "verification": {
+    "n_observations": 1115,
+    "episodes": 3,
+    "actions_identical": true,
+    "max_abs_score_diff": 7.62939453125e-06,
+    "atol": 0.0001,
+    "temperatures": [
+      0.3,
+      1.0,
+      4.0
+    ],
+    "verified_on": "PPO episodes on the shift_eval pool at the shift_fitted reference"
+  },
+  "git_commit": "a75747a8120f817433217dc9902ff963c35c5ffe",
+  "git_dirty": false,
+  "versions": {
+    "python": "3.13.2",
+    "torch": "2.13.0+cpu",
+    "stable_baselines3": "2.9.0",
+    "onnx": "1.22.0",
+    "onnxruntime": "1.28.0"
+  }
+}

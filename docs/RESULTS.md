@@ -333,6 +333,14 @@ Roadmap item 9. Read from `results/export_record.json` and
 seeded random inputs, ONNX Runtime and PyTorch gave identical predictions, and their
 logits differed by at most 1.96e-05, within the 1e-4 tolerance.
 
+**The deployed path on real photographs.** Read from `results/demo_logit_check.json`. The
+12 demonstration sample photographs (10 PlantDoc, from the store; 2 PlantVillage, kept off
+the public store by their licence) went through the deployed path: NumPy and Pillow
+preprocessing, then the exported classifier on ONNX Runtime's CPU provider. Their logits
+differed from the ones stage 02 recorded for the same photographs with PyTorch by at most
+1.24e-05, within the 1e-4 tolerance, and every prediction agreed. The random-input check
+above tests the graph; this one also covers image decoding and preprocessing.
+
 **Latency.** Measured on a laptop, not on drone hardware: an 11th Gen Intel Core
 i7-1165G7 at 2.80 GHz (4 cores, 8 threads), 15.7 GB RAM, Windows 11, on mains power;
 ONNX Runtime 1.28.0 on the CPU, Python 3.13.2. One image per call (1 × 3 × 224 × 224),

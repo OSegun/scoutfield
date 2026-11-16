@@ -1,10 +1,10 @@
 {
   "run_id": "r2026-11-13",
   "store": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts",
-  "store_revision": "699392734c937bcb827d99dff3244523fbf6d43d",
-  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/699392734c937bcb827d99dff3244523fbf6d43d/runs/r2026-11-13",
-  "promoted_at": "2026-11-14T13:10:16+00:00",
-  "promoted_by_commit": "1e0a35e42c70007c773d9053f546f83dae22ad52",
+  "store_revision": "fa19b05b0584b411c6fcd8f90ca32b7bb5d5f793",
+  "store_run_url": "https://huggingface.co/datasets/OSegun/scoutfield-artifacts/tree/fa19b05b0584b411c6fcd8f90ca32b7bb5d5f793/runs/r2026-11-13",
+  "promoted_at": "2026-11-16T14:18:40+00:00",
+  "promoted_by_commit": "cde47de3834d125d29ba2f5c3868568b0104c1a5",
   "stage_commits": {
     "01_perception": "193ec3f779f0c3d37ed1c29ce5be160609853751",
     "02_calibration": "193ec3f779f0c3d37ed1c29ce5be160609853751",
@@ -12,7 +12,7 @@
     "04_sweep": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
     "05_tau": "fe6b33d4179506a0ba576b122b722dabb7cd5e47",
     "06_figures": "c2f0b92fc4f787188d9f3434754502688ef315b4",
-    "08_deployment": "1e0a35e42c70007c773d9053f546f83dae22ad52"
+    "08_deployment": "cde47de3834d125d29ba2f5c3868568b0104c1a5"
   },
   "files": [
     {
@@ -124,6 +124,18 @@
       "store_commit": "d6951aef111e1552921beab0c31b155770c1f68e"
     },
     {
+      "path": "results/demo_logit_check.json",
+      "stage": "08_deployment",
+      "sha256": "6084a50a80da4f84b67f57707ac5f74a4ab9356047aeae2c1d71846eaff99f18",
+      "store_commit": "041310fddfd7d60459d94c0bb15900b81af6ea83"
+    },
+    {
+      "path": "results/demo_samples.json",
+      "stage": "08_deployment",
+      "sha256": "7c37691e8035ba65c0a02b8178ccdbf1116d16ac0fe5045ef581c6b39e5a50b5",
+      "store_commit": "0a3067d1ace674749cccc6f03cc8672ef7a52d0f"
+    },
+    {
       "path": "results/deployment_latency.json",
       "stage": "08_deployment",
       "sha256": "48b9e41c2170defbf5422b288fa1044aac09e7da7bc15df13b35bb2b2661528b",
@@ -134,6 +146,12 @@
       "stage": "08_deployment",
       "sha256": "98c24587eb618b03f64459d96d21fcdc2001cd210085f1d364cfc2c97dc4cd67",
       "store_commit": "0608995f75b3bea6a9ea24c23c960bda5a250471"
+    },
+    {
+      "path": "results/policy_export_record.json",
+      "stage": "08_deployment",
+      "sha256": "efb69ed1f7da5664c47cebdaa03264d8d79aa3e7e54857673813b1df562368b7",
+      "store_commit": "85105bde7abe538b666987ebec8f0e642f66484d"
     }
   ]
 }

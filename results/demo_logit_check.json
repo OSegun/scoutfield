@@ -1,0 +1,142 @@
+{
+  "run_id": "r2026-11-13",
+  "checked_at": "2026-11-16T14:17:12+00:00",
+  "what": "demonstration sample photographs through the deployed path (NumPy and Pillow preprocessing, ONNX Runtime on the CPU) against the logit stage 02 recorded for the same photograph (PyTorch, from the stored logit pool)",
+  "onnx": {
+    "file": "classifier.onnx",
+    "sha256": "3afde6d9763ec14abf403badd465797ad07ea53f221efbf6fe5f1fe51318cf33",
+    "source": "local export .artifact_cache/deployment/r2026-11-13/classifier.onnx"
+  },
+  "sample_sources": {
+    "store": {
+      "n": 10,
+      "where": "runs/r2026-11-13/08_deployment/demo_samples.json"
+    },
+    "laptop_only": {
+      "n": 2,
+      "where": "samples_local",
+      "note": "licence keeps these images out of the public store; their logits are recorded here"
+    }
+  },
+  "n_samples": 12,
+  "max_abs_difference": 1.239776611328125e-05,
+  "logit_atol": 0.0001,
+  "passed": true,
+  "samples": [
+    {
+      "store_name": "plantdoc_01.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Potato_leaf_late_blight/train_Potato leaf late blight_91_5.jpg",
+      "stage02_logit": 3.6727826595306396,
+      "deployed_logit": 3.6727867126464844,
+      "abs_difference": 4.0531158447265625e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_02.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Apple_rust_leaf/train_Apple rust leaf_66_3.jpg",
+      "stage02_logit": 6.141951084136963,
+      "deployed_logit": 6.141946792602539,
+      "abs_difference": 4.291534423828125e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_03.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Squash_Powdery_mildew_leaf/train_Squash Powdery mildew leaf_31.jpg",
+      "stage02_logit": 8.38483715057373,
+      "deployed_logit": 8.384832382202148,
+      "abs_difference": 4.76837158203125e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_04.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Corn_leaf_blight/train_Corn leaf blight_46.jpg",
+      "stage02_logit": 11.263131141662598,
+      "deployed_logit": 11.263118743896484,
+      "abs_difference": 1.239776611328125e-05,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_05.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Apple_leaf/train_Apple leaf_57.jpg",
+      "stage02_logit": -1.1801203489303589,
+      "deployed_logit": -1.180121898651123,
+      "abs_difference": 1.5497207641601562e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_06.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Tomato_leaf/train_Tomato leaf_30.jpg",
+      "stage02_logit": -2.5217032432556152,
+      "deployed_logit": -2.5217015743255615,
+      "abs_difference": 1.6689300537109375e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_07.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Apple_leaf/train_Apple leaf_1.jpg",
+      "stage02_logit": -4.417359352111816,
+      "deployed_logit": -4.417356967926025,
+      "abs_difference": 2.384185791015625e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_08.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Blueberry_leaf/train_Blueberry leaf_106.jpg",
+      "stage02_logit": -6.743227005004883,
+      "deployed_logit": -6.743227958679199,
+      "abs_difference": 9.5367431640625e-07,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_09.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Corn_rust_leaf/train_Corn rust leaf_52.jpg",
+      "stage02_logit": -7.538369178771973,
+      "deployed_logit": -7.53837776184082,
+      "abs_difference": 8.58306884765625e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantdoc_10.jpg",
+      "dataset": "plantdoc",
+      "key": "test/Soyabean_leaf/test_Soyabean leaf_5.jpg",
+      "stage02_logit": 14.115073204040527,
+      "deployed_logit": 14.115074157714844,
+      "abs_difference": 9.5367431640625e-07,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantvillage_01.jpg",
+      "dataset": "plantvillage",
+      "key": "color/Tomato___Tomato_Yellow_Leaf_Curl_Virus/55dcc83b-4c4a-4ce3-84ab-3b57f30b0525___YLCV_GCREC 5222.JPG",
+      "stage02_logit": 14.587261199951172,
+      "deployed_logit": 14.587259292602539,
+      "abs_difference": 1.9073486328125e-06,
+      "same_prediction": true
+    },
+    {
+      "store_name": "plantvillage_02.jpg",
+      "dataset": "plantvillage",
+      "key": "color/Soybean___healthy/9978ae8f-356a-458e-9ab7-6ed2d14c36b1___RS_HL 4635.JPG",
+      "stage02_logit": -11.808619499206543,
+      "deployed_logit": -11.808615684509277,
+      "abs_difference": 3.814697265625e-06,
+      "same_prediction": true
+    }
+  ],
+  "git_commit": "cde47de3834d125d29ba2f5c3868568b0104c1a5",
+  "git_dirty": false,
+  "versions": {
+    "python": "3.13.2",
+    "onnxruntime": "1.28.0",
+    "numpy": "2.5.1"
+  }
+}

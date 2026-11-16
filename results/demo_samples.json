@@ -1,0 +1,106 @@
+{
+  "run_id": "r2026-11-13",
+  "rule": "configs/deployment.yaml demo.samples",
+  "samples": [
+    {
+      "store_name": "plantdoc_01.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Potato_leaf_late_blight/train_Potato leaf late blight_91_5.jpg",
+      "true_label": "diseased",
+      "class_folder": "Potato_leaf_late_blight",
+      "logit": 3.6727826595306396,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_02.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Apple_rust_leaf/train_Apple rust leaf_66_3.jpg",
+      "true_label": "diseased",
+      "class_folder": "Apple_rust_leaf",
+      "logit": 6.141951084136963,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_03.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Squash_Powdery_mildew_leaf/train_Squash Powdery mildew leaf_31.jpg",
+      "true_label": "diseased",
+      "class_folder": "Squash_Powdery_mildew_leaf",
+      "logit": 8.38483715057373,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_04.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Corn_leaf_blight/train_Corn leaf blight_46.jpg",
+      "true_label": "diseased",
+      "class_folder": "Corn_leaf_blight",
+      "logit": 11.263131141662598,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_05.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Apple_leaf/train_Apple leaf_57.jpg",
+      "true_label": "healthy",
+      "class_folder": "Apple_leaf",
+      "logit": -1.1801203489303589,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_06.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Tomato_leaf/train_Tomato leaf_30.jpg",
+      "true_label": "healthy",
+      "class_folder": "Tomato_leaf",
+      "logit": -2.5217032432556152,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_07.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Apple_leaf/train_Apple leaf_1.jpg",
+      "true_label": "healthy",
+      "class_folder": "Apple_leaf",
+      "logit": -4.417359352111816,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_08.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Blueberry_leaf/train_Blueberry leaf_106.jpg",
+      "true_label": "healthy",
+      "class_folder": "Blueberry_leaf",
+      "logit": -6.743227005004883,
+      "correct": true,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_09.jpg",
+      "dataset": "plantdoc",
+      "key": "train/Corn_rust_leaf/train_Corn rust leaf_52.jpg",
+      "true_label": "diseased",
+      "class_folder": "Corn_rust_leaf",
+      "logit": -7.538369178771973,
+      "correct": false,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    },
+    {
+      "store_name": "plantdoc_10.jpg",
+      "dataset": "plantdoc",
+      "key": "test/Soyabean_leaf/test_Soyabean leaf_5.jpg",
+      "true_label": "healthy",
+      "class_folder": "Soyabean_leaf",
+      "logit": 14.115073204040527,
+      "correct": false,
+      "licence": "PlantDoc (Singh et al., 2020), CC BY 4.0, https://github.com/pratikkayal/PlantDoc-Dataset; copy from Kaggle nirmalsankalana/plantdoc-dataset. Images unchanged."
+    }
+  ]
+}
