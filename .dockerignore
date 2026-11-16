@@ -1,0 +1,10 @@
+# Allow-list: the image gets the package, its configs and the licence, and nothing
+# else. Everything else stays out by default, including the virtual environment,
+# caches, checkpoints, the offline demo folder and datasets, results working copies,
+# local notes excluded from git, and the git history itself.
+*
+!scoutfield/
+!configs/
+!LICENSE
+**/__pycache__
+**/*.pyc
