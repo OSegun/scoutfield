@@ -156,3 +156,34 @@ demo:
   # cells. The script prints the table it chose from.
   seed_candidates: 30
   default_seed: 28
+  # The "Analyse your leaves" panel: a visitor's own images, each through exactly the
+  # deployed path (eval_array preprocessing, the exported classifier, the
+  # shift-fitted temperature). Uploads are held in memory only: never written to
+  # disk, never sent to the store. The limits below keep the hosted app's peak memory
+  # well under the 1 GB Streamlit Community Cloud allows; the measurement behind them
+  # is in docs/METHOD.md, section "6. Deployment", subsection "The demonstration".
+  upload:
+    # Images analysed per batch. Streamlit holds every uploaded file in memory at
+    # once, so this times max_file_mb bounds that part of memory (100 MB). Images are
+    # then decoded one at a time, process-wide (one lock across all visitors), and
+    # only a thumbnail is kept, so decoded pixels do not add up across a batch or
+    # across visitors. Files beyond this number are refused by name.
+    max_files: 10
+    # Largest file accepted, in megabytes. Also passed to Streamlit's uploader, so a
+    # larger file is refused before it is held in memory. A phone photograph is
+    # typically 2 to 8 MB.
+    max_file_mb: 10
+    # Largest image accepted, in megapixels, read from the file header before any
+    # pixel is decoded. A small compressed file can decode to a very large image: 24
+    # megapixels of RGB is 72 MB. Most phone cameras save 12 megapixels by default.
+    # Measured worst case (ten 24-megapixel JPEGs of 9.1 MB each in one batch, run
+    # from the store on the laptop of docs/RESULTS.md, section "8. Deployment"):
+    # peak working set 524 MB, against 221 MB after the page loads.
+    max_megapixels: 24
+    # Side of the thumbnail kept for display, in pixels. The full image is discarded
+    # once it has been classified.
+    thumbnail_px: 160
+    # Download names of the report: the numbers as CSV, and a Markdown summary
+    # carrying the settings and the stated limits. Neither contains the images.
+    report_csv: scoutfield_leaf_analysis.csv
+    report_markdown: scoutfield_leaf_analysis.md

@@ -549,3 +549,210 @@ def test_find_image_accepts_a_kaggle_single_file_download(tmp_path):
     assert demo.find_image(tmp_path, "train/Apple_leaf/train_Apple leaf_57.jpg") == saved
     with pytest.raises(FileNotFoundError, match="Pear_leaf"):
         demo.find_image(tmp_path, "train/Pear_leaf/train_Apple leaf_57.jpg")
+
+
+# --------------------------------------- demonstration: a visitor's own images
+#
+# The "Analyse your leaves" panel, tested through the tiny classifier above: no
+# network, no downloaded weights, no PyTorch. Images are built in memory.
+
+LEAF_FITTED = 2.0
+LEAF_TEMPERATURES = (0.3, 0.5, 1.0, 2.0, 3.0, 4.0)
+LEAF_TAU = 0.75
+LEAF_CONTEXT = {"run_id": "rtest", "reference_condition": "shift_fitted",
+                "fitted_temperature": LEAF_FITTED, "tau": LEAF_TAU,
+                "repository_url": "https://example.org/scoutfield"}
+
+
+def _image_bytes(value: int, size=(64, 48), fmt="PNG") -> bytes:
+    """A flat image of one grey level, encoded in memory."""
+    import io
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGB", size, (value, value, value)).save(out, format=fmt)
+    return out.getvalue()
+
+
+@pytest.fixture()
+def leaf_model(tmp_path):
+    from scoutfield.app.inference import ScoutPlanInference
+
+    return ScoutPlanInference(_tiny_classifier(tmp_path / "tiny.onnx"),
+                              temperature=LEAF_FITTED)
+
+
+def _analyse(model, uploads, **overrides):
+    from scoutfield.app import demo
+
+    limits = {"max_files": 10, "max_file_mb": 10.0, "max_megapixels": 24.0,
+              "thumbnail_px": 160}
+    limits.update(overrides)
+    return demo.analyse_uploads(model, uploads, LEAF_TEMPERATURES, LEAF_TAU,
+                                demo.UploadLimits(**limits))
+
+
+def test_upload_limits_are_read_from_the_config():
+    from scoutfield.app.demo import UploadLimits, deployment_config
+
+    up = deployment_config().section("demo")["upload"]
+    limits = UploadLimits.from_config()
+    assert limits.max_files == int(up["max_files"])
+    assert limits.max_file_mb == float(up["max_file_mb"])
+    assert limits.max_megapixels == float(up["max_megapixels"])
+    assert limits.thumbnail_px == int(up["thumbnail_px"])
+
+
+def test_a_batch_goes_through_the_deployed_path(leaf_model):
+    """Each row equals the Classify panel's prediction for the same image."""
+    import io
+
+    from PIL import Image
+
+    uploads = [("white.png", _image_bytes(255)),
+               ("grey.jpg", _image_bytes(128, fmt="JPEG")),
+               ("black.png", _image_bytes(0))]
+    result = _analyse(leaf_model, uploads)
+    assert [r["file"] for r in result["rows"]] == ["white.png", "grey.jpg", "black.png"]
+    assert result["rejected"] == []
+    assert (result["low_T"], result["high_T"]) == (0.3, 4.0)
+    for (_, data), row in zip(uploads, result["rows"]):
+        direct = leaf_model.predict(Image.open(io.BytesIO(data)))
+        assert row["logit"] == pytest.approx(direct["logit"])
+        assert row["probability_calibrated"] == pytest.approx(
+            _sigmoid(direct["logit"] / LEAF_FITTED))
+        assert row["probability_low_T"] == pytest.approx(
+            _sigmoid(direct["logit"] / (0.3 * LEAF_FITTED)))
+        assert row["probability_high_T"] == pytest.approx(
+            _sigmoid(direct["logit"] / (4.0 * LEAF_FITTED)))
+        assert row["prediction"] == ("diseased" if direct["logit"] > 0 else "healthy")
+        assert max(row["thumbnail"].size) <= 160
+    s = result["summary"]
+    assert (s["n"], s["diseased"], s["healthy"]) == (3, 2, 1)
+
+    # Streamlit hands over in-memory file objects; read directly, they give the
+    # same rows as the bytes.
+    as_files = _analyse(leaf_model, [(n, io.BytesIO(d)) for n, d in uploads])
+    assert [r["logit"] for r in as_files["rows"]] == [r["logit"] for r in result["rows"]]
+
+
+def test_uncertain_means_neither_class_reaches_tau(leaf_model):
+    from scoutfield.app.demo import is_uncertain
+
+    assert is_uncertain(0.5, 0.75)
+    assert is_uncertain(0.26, 0.75) and is_uncertain(0.74, 0.75)
+    assert not is_uncertain(0.75, 0.75) and not is_uncertain(0.25, 0.75)
+    assert not is_uncertain(0.95, 0.75) and not is_uncertain(0.05, 0.75)
+
+    result = _analyse(leaf_model, [("white.png", _image_bytes(255)),
+                                   ("grey.png", _image_bytes(128)),
+                                   ("black.png", _image_bytes(0))])
+    assert [r["uncertain"] for r in result["rows"]] == [False, True, False]
+    assert result["summary"]["uncertain"] == 1
+    assert result["summary"]["uncertain_share"] == pytest.approx(1 / 3)
+    assert "between 0.25 and 0.75" in result["summary"]["sentence"]
+
+
+def test_the_report_holds_numbers_and_limits_never_images(leaf_model):
+    import csv
+    import io
+
+    from scoutfield.app import demo
+
+    result = _analyse(leaf_model, [("white.png", _image_bytes(255)),
+                                   ("grey.png", _image_bytes(128)),
+                                   ("notes.txt", b"not an image")])
+    table_text = demo.report_csv(result)
+    table = list(csv.reader(io.StringIO(table_text)))
+    assert table[0] == ["file", "prediction", "probability_T1", "probability_T0.3",
+                        "probability_T4", "logit", "uncertain"]
+    assert [row[0] for row in table[1:]] == ["white.png", "grey.png"]
+    assert table[2][6] == "yes"
+    assert float(table[1][2]) == pytest.approx(
+        result["rows"][0]["probability_calibrated"], abs=5e-5)
+
+    text = demo.report_markdown(result, LEAF_CONTEXT)
+    for line in demo.LIMITS_TEXT + (demo.PRIVACY_TEXT,):
+        assert line in text
+    assert "rtest" in text and "2.0000" in text and "notes.txt" in text
+    assert result["summary"]["sentence"] in text
+    # Numbers and text only: no encoded pixels in either file.
+    for report in (text, table_text):
+        assert "data:image" not in report and "base64" not in report
+        assert "\x89PNG" not in report and "JFIF" not in report
+
+
+def test_uploads_over_the_limits_are_refused_by_name(leaf_model, monkeypatch):
+    from PIL import Image
+
+    files = [(f"leaf{i}.png", _image_bytes(200)) for i in range(4)]
+    result = _analyse(leaf_model, files, max_files=3)
+    assert len(result["rows"]) == 3
+    assert result["rejected"] == [("leaf3.png: over the limit of 3 images per batch; "
+                                   "analyse it in another batch")]
+
+    big = _image_bytes(200, size=(400, 400))
+    result = _analyse(leaf_model, [("big.png", big)],
+                      max_file_mb=len(big) / 2 / 1024 ** 2)
+    assert result["rows"] == []
+    assert result["rejected"][0].startswith("big.png: ")
+    assert "MB limit" in result["rejected"][0]
+
+    # Refused from the header, before any pixel is decoded.
+    wide = _image_bytes(200, size=(3000, 1000))
+    decoded = []
+    original = Image.Image.load
+    monkeypatch.setattr(Image.Image, "load",
+                        lambda self: decoded.append(self.size) or original(self))
+    result = _analyse(leaf_model, [("wide.png", wide)], max_megapixels=2.0)
+    assert decoded == []
+    assert "3000 x 1000 pixels is over the 2 megapixel limit" in result["rejected"][0]
+    monkeypatch.undo()
+
+    result = _analyse(leaf_model, [("anim.gif", _image_bytes(200, fmt="GIF")),
+                                   ("text.png", b"\x89PNG broken")])
+    assert result["rows"] == []
+    assert result["rejected"] == ["anim.gif: GIF is not accepted; use JPG or PNG",
+                                  "text.png: not a readable JPG or PNG image"]
+
+
+def test_analysing_uploads_writes_nothing_to_disk(leaf_model, monkeypatch, tmp_path):
+    """Privacy: a visitor's images are processed in memory and never written."""
+    import builtins
+    import io
+    import os
+    import tempfile
+
+    from scoutfield.app import demo
+
+    uploads = [("white.png", _image_bytes(255)),
+               ("grey.jpg", _image_bytes(128, fmt="JPEG"))]
+    writes = []
+    real_open, real_os_open = builtins.open, os.open
+
+    def guarded_open(file, mode="r", *args, **kwargs):
+        if any(flag in mode for flag in "wax+"):
+            writes.append(str(file))
+        return real_open(file, mode, *args, **kwargs)
+
+    def guarded_os_open(path, flags, *args, **kwargs):
+        if flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT):
+            writes.append(str(path))
+        return real_os_open(path, flags, *args, **kwargs)
+
+    temp_before = set(os.listdir(tempfile.gettempdir()))
+    monkeypatch.setattr(builtins, "open", guarded_open)
+    monkeypatch.setattr(io, "open", guarded_open)
+    monkeypatch.setattr(os, "open", guarded_os_open)
+    monkeypatch.chdir(tmp_path)
+
+    result = _analyse(leaf_model, uploads)
+    demo.report_markdown(result, LEAF_CONTEXT)
+    demo.report_csv(result)
+    monkeypatch.undo()
+
+    assert len(result["rows"]) == 2
+    assert writes == []
+    assert [p.name for p in tmp_path.iterdir()] == ["tiny.onnx"]
+    assert set(os.listdir(tempfile.gettempdir())) - temp_before == set()

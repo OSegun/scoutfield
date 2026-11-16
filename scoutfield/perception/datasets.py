@@ -366,7 +366,8 @@ def eval_array(image, image_size: int):
     import numpy as np
     from PIL import Image
 
-    image = image.convert("RGB")
+    if image.mode != "RGB":  # convert() copies even an RGB image; no pixel changes
+        image = image.convert("RGB")
     short = int(image_size * EVAL_RESIZE_FACTOR)
     w, h = image.size
     if w <= h:

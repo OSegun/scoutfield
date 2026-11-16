@@ -96,7 +96,10 @@ class ScoutPlanInference:
             with Image.open(image) as im:
                 image = im.convert("RGB")
         elif hasattr(image, "convert"):
-            image = image.convert("RGB")
+            # convert() copies even an RGB image; skipping it saves one full-size
+            # copy of a large photograph and changes no pixel.
+            if image.mode != "RGB":
+                image = image.convert("RGB")
         else:
             raise TypeError(f"expected a path or a PIL image, got {type(image)}")
 

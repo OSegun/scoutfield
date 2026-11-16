@@ -12,7 +12,7 @@ proves nothing about this work. The demonstration is the *coupling*: that a
 miscalibrated classifier changes where a planner chooses to fly and how much
 disease it finds per joule.
 
-Three panels, in this order:
+Four panels, in this order:
 
 1. **Classify.** A sample or uploaded leaf image; the probability, the prediction
    and the raw logit. The temperature slider is the experiment's T, relative to the
@@ -26,6 +26,12 @@ Three panels, in this order:
 3. **Compare.** The measured detections per joule against T, with intervals, and
    the degradation over the three spans, read from the run's ``summary.json``:
    never hard-coded, never edited by hand.
+
+4. **Analyse your leaves.** A visitor's own photographs, as a batch, through the
+   same deployed path: calibrated probability, the same image at the sweep's
+   lowest and highest T, the raw logit, an "uncertain" flag tied to τ, a batch
+   summary and a downloadable report. Uploads stay in memory and never reach disk
+   or the store; the limits in ``demo.upload`` keep memory bounded.
 
 Honesty in the interface
 -------------------------
@@ -367,6 +373,93 @@ def _compare_panel(st, res) -> None:
                "shows it losing.")
 
 
+def _escape(text: str) -> str:
+    """A visitor's file name shown as plain text, not read as Markdown."""
+    return "".join(f"\\{ch}" if ch in "\\`*_{}[]()#+-.!|<>~:$" else ch for ch in text)
+
+
+def _analyse_panel(st, res) -> None:
+    """Panel 4: a visitor's own leaves, through the deployed path, to a report."""
+    from scoutfield.app import demo
+
+    st.subheader("4. Analyse your leaves")
+    settings, cfg = res["settings"](), res["config"]()
+    limits = demo.UploadLimits.from_config(cfg)
+    files_cfg = cfg.section("demo")["upload"]
+    st.write(
+        "Upload photographs of your own leaves. Each one goes through the same path as "
+        "the Classify panel: the same image preparation, the exported classifier, and "
+        "the temperature fitted on held-out field photographs.")
+    st.info(demo.PRIVACY_TEXT)
+    with st.expander("What this can and cannot tell you", expanded=False):
+        for text in demo.LIMITS_TEXT:
+            st.markdown(f"- {text}")
+
+    uploads = st.file_uploader(
+        f"leaf photographs (JPG or PNG; up to {limits.max_files} per batch, "
+        f"{limits.max_file_mb:g} MB and {limits.max_megapixels:g} megapixels each)",
+        type=["jpg", "jpeg", "png"], accept_multiple_files=True,
+        max_upload_size=int(limits.max_file_mb), key="leaf_uploads")
+    if not uploads:
+        st.caption("Nothing uploaded yet. Results and the report appear here.")
+        return
+
+    # Analysed once per set of files, not on every rerun of the page. Held in this
+    # visitor's session (memory) only, and replaced when the files change.
+    key = tuple(u.file_id for u in uploads)
+    if st.session_state.get("leaf_key") != key:
+        with st.spinner("Classifying"):
+            st.session_state["leaf_result"] = demo.analyse_uploads(
+                res["classifier"](), [(u.name, u) for u in uploads],
+                settings.temperatures, settings.tau, limits)
+        st.session_state["leaf_key"] = key
+    result = st.session_state["leaf_result"]
+
+    for reason in result["rejected"]:
+        st.warning(f"Not analysed: {reason}.")
+    if not result["rows"]:
+        return
+
+    s = result["summary"]
+    a, b, c, d = st.columns(4)
+    a.metric("images analysed", s["n"])
+    b.metric("predicted diseased", s["diseased"])
+    c.metric("predicted healthy", s["healthy"])
+    d.metric("uncertain", f"{s['uncertain']} ({s['uncertain_share']:.0%})")
+    st.write(s["sentence"])
+
+    low, high = result["low_T"], result["high_T"]
+    for row in result["rows"]:
+        left, mid, right = st.columns([1, 2, 3])
+        left.image(row["thumbnail"])
+        mid.markdown(f"**{_escape(row['file'])}**  \n{row['prediction']}"
+                     + ("  \n:orange[uncertain]" if row["uncertain"] else ""))
+        right.markdown(
+            f"P(diseased), calibrated (T = 1): **{row['probability_calibrated']:.3f}**  \n"
+            f"at T = {low:g} (overconfident): {row['probability_low_T']:.3f}; "
+            f"at T = {high:g} (underconfident): {row['probability_high_T']:.3f}  \n"
+            f"raw logit: {row['logit']:+.3f}")
+    st.caption(
+        f"Uncertain: calibrated probability between {1 - settings.tau:g} and "
+        f"{settings.tau:g}, the planners' confirmation threshold. The prediction comes "
+        "from the sign of the logit, so it stays the same at every T; only the stated "
+        "confidence moves.")
+
+    context = {"run_id": res["store"]().run_id,
+               "reference_condition": settings.reference_condition,
+               "fitted_temperature": res["reference_temperature"](),
+               "tau": settings.tau,
+               "repository_url": cfg.section("demo")["repository_url"]}
+    left, right = st.columns(2)
+    left.download_button("Download the report (Markdown)",
+                         demo.report_markdown(result, context),
+                         file_name=str(files_cfg["report_markdown"]),
+                         mime="text/markdown", on_click="ignore")
+    right.download_button("Download the numbers (CSV)", demo.report_csv(result),
+                          file_name=str(files_cfg["report_csv"]), mime="text/csv",
+                          on_click="ignore")
+
+
 def main() -> None:
     import streamlit as st
 
@@ -387,6 +480,8 @@ def main() -> None:
     _plan_panel(st, res)
     st.divider()
     _compare_panel(st, res)
+    st.divider()
+    _analyse_panel(st, res)
 
 
 if __name__ == "__main__":

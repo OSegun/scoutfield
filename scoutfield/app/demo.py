@@ -20,6 +20,7 @@ field seeded ``seed * 10_000 + episode``. Nothing here imports torch.
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -337,6 +338,246 @@ def choose_seed(summary: dict, settings: DemoSettings, pool, reference_temperatu
                      "detections_per_joule": values})
     best = min(rows, key=lambda r: r["mean_relative_difference"])
     return {"seed": best["seed"], "rows": rows}
+
+
+# ------------------------------------------------------- a visitor's own images
+#
+# The "Analyse your leaves" panel. Every image goes through the deployed path
+# unchanged (``ScoutPlanInference.preprocess`` and ``.predict``), and nothing a
+# visitor uploads is written anywhere: files are read from bytes in memory, and the
+# report is returned as text for the page to offer as a download.
+
+#: Stated on the page and in the report, so the two cannot say different things.
+LIMITS_TEXT = (
+    ("Two classes only: healthy or diseased. The classifier does not name a disease "
+     "or judge its severity."),
+    ("Trained on PlantVillage photographs of single leaves taken in a laboratory, and "
+     "calibrated on held-out PlantDoc photographs taken in fields. Images unlike both "
+     "may be classified poorly, and the stated probability may not hold for them."),
+    "Not a diagnosis. Confirm any finding with an agronomist or a plant clinic.",
+    ("Any image gets a prediction, including one that shows no leaf at all. The "
+     "classifier cannot tell that an image is not a leaf."),
+)
+PRIVACY_TEXT = ("Uploaded images are processed in memory and discarded. They are not "
+                "saved to disk, sent to the artefact store, or included in the report.")
+
+
+class UploadRejected(ValueError):
+    """An uploaded file the panel will not analyse, with the reason."""
+
+
+@dataclass(frozen=True)
+class UploadLimits:
+    max_files: int
+    max_file_mb: float
+    max_megapixels: float
+    thumbnail_px: int
+
+    @classmethod
+    def from_config(cls, config=None) -> UploadLimits:
+        config = config or deployment_config()
+        up = config.section("demo")["upload"]
+        return cls(int(up["max_files"]), float(up["max_file_mb"]),
+                   float(up["max_megapixels"]), int(up["thumbnail_px"]))
+
+
+def open_upload(name: str, data, limits: UploadLimits):
+    """Decode one uploaded file from memory, refusing it if it breaks a limit.
+
+    ``data`` is the file's bytes or an in-memory binary file (Streamlit's uploaded
+    file is one, and reading it directly avoids a second copy of its bytes). The file
+    size and the pixel count (read from the header, before decoding) are checked
+    first, so an oversized image is refused without being decoded.
+    """
+    import io
+
+    from PIL import Image, UnidentifiedImageError
+
+    stream = io.BytesIO(data) if isinstance(data, (bytes, bytearray)) else data
+    stream.seek(0, io.SEEK_END)
+    size = stream.tell()
+    stream.seek(0)
+    if size > limits.max_file_mb * 1024 * 1024:
+        raise UploadRejected(f"{name}: {size / 1024 / 1024:.1f} MB is over the "
+                             f"{limits.max_file_mb:g} MB limit")
+    try:
+        image = Image.open(stream)
+    except (UnidentifiedImageError, OSError) as exc:
+        raise UploadRejected(f"{name}: not a readable JPG or PNG image") from exc
+    if image.format not in ("JPEG", "PNG"):
+        raise UploadRejected(f"{name}: {image.format} is not accepted; use JPG or PNG")
+    width, height = image.size
+    if width * height > limits.max_megapixels * 1e6:
+        raise UploadRejected(f"{name}: {width} x {height} pixels is over the "
+                             f"{limits.max_megapixels:g} megapixel limit")
+    try:
+        image.load()
+    except (OSError, Image.DecompressionBombError) as exc:
+        raise UploadRejected(f"{name}: the image data could not be decoded") from exc
+    return image
+
+
+def _thumbnail(image, size: int):
+    """A small RGB copy for display, turned upright by its EXIF orientation.
+
+    Display only: phone photographs record their rotation in EXIF, and the
+    classifier sees the pixels exactly as the deployed path reads them. The image is
+    shrunk before it is turned, so no second full-size copy is made.
+    """
+    from PIL import Image, ImageOps
+
+    turn = {2: Image.Transpose.FLIP_LEFT_RIGHT, 3: Image.Transpose.ROTATE_180,
+            4: Image.Transpose.FLIP_TOP_BOTTOM, 5: Image.Transpose.TRANSPOSE,
+            6: Image.Transpose.ROTATE_270, 7: Image.Transpose.TRANSVERSE,
+            8: Image.Transpose.ROTATE_90}.get(image.getexif().get(0x0112))
+    small = ImageOps.contain(image, (size, size)).convert("RGB")
+    return small.transpose(turn) if turn is not None else small
+
+
+def is_uncertain(probability: float, tau: float) -> bool:
+    """True when neither class reaches the planners' confirmation threshold τ.
+
+    A planner confirms a cell as diseased when its belief reaches τ; by symmetry, a
+    probability at or below 1 - τ is a confident "healthy". Between the two, the
+    calibrated classifier is not sure enough for either.
+    """
+    return (1.0 - tau) < probability < tau
+
+
+#: One full-size decoded image at a time in this process, whichever visitor sent
+#: it: hosted, every visitor shares one process and one memory limit.
+_DECODE_LOCK = threading.Lock()
+
+
+def analyse_uploads(model, uploads, temperatures, tau: float, limits: UploadLimits) -> dict:
+    """Run a batch of ``(name, data)`` uploads through the deployed classifier.
+
+    ``data`` is bytes or an in-memory binary file. Each image is decoded,
+    preprocessed once, and scored at T = 1 (calibrated) and at the lowest and
+    highest temperatures of the sweep. Only a small thumbnail is kept; the decoded
+    image is released before the next one is opened. Returns the rows, the refused
+    files with their reasons, and the batch summary.
+    """
+    low, high = min(temperatures), max(temperatures)
+    rows, rejected = [], []
+    for index, (name, data) in enumerate(uploads):
+        if index >= limits.max_files:
+            rejected.append(f"{name}: over the limit of {limits.max_files} images per "
+                            "batch; analyse it in another batch")
+            continue
+        with _DECODE_LOCK:
+            try:
+                image = open_upload(name, data, limits)
+            except UploadRejected as exc:
+                rejected.append(str(exc))
+                continue
+            batch = model.preprocess(image)
+            thumbnail = _thumbnail(image, limits.thumbnail_px)
+            image.close()
+            del image
+        at_one = model.predict(batch, relative_temperature=1.0)
+        p = at_one["probability"]
+        rows.append({
+            "file": name,
+            "prediction": "diseased" if at_one["prediction"] else "healthy",
+            "probability_calibrated": p,
+            "probability_low_T": model.predict(batch, relative_temperature=low)["probability"],
+            "probability_high_T": model.predict(batch, relative_temperature=high)["probability"],
+            "logit": at_one["logit"],
+            "uncertain": is_uncertain(p, tau),
+            "thumbnail": thumbnail,
+        })
+    return {"rows": rows, "rejected": rejected,
+            "summary": batch_summary(rows, tau), "low_T": low, "high_T": high}
+
+
+def batch_summary(rows: list[dict], tau: float) -> dict:
+    """Counts by prediction, the uncertain share, and one plain sentence."""
+    n = len(rows)
+    diseased = sum(r["prediction"] == "diseased" for r in rows)
+    uncertain = sum(r["uncertain"] for r in rows)
+    share = uncertain / n if n else 0.0
+    sentence = (
+        f"Of {n} image{'s' if n != 1 else ''}, {diseased} "
+        f"{'was' if diseased == 1 else 'were'} predicted diseased and {n - diseased} "
+        f"healthy; {uncertain} ({share:.0%}) "
+        f"{'was' if uncertain == 1 else 'were'} uncertain, with a calibrated probability "
+        f"between {1 - tau:g} and {tau:g}. The classifier can say whether a photograph "
+        "looks more like the diseased or the healthy leaves it learned from, and how sure "
+        "it is once calibrated on field photographs. It cannot say which disease, how "
+        "severe, or whether the photograph shows a leaf at all."
+    ) if n else "No image was analysed."
+    return {"n": n, "diseased": diseased, "healthy": n - diseased,
+            "uncertain": uncertain, "uncertain_share": share, "sentence": sentence}
+
+
+REPORT_COLUMNS = ("file", "prediction", "probability_calibrated", "probability_low_T",
+                  "probability_high_T", "logit", "uncertain")
+
+
+def report_csv(result: dict) -> str:
+    """The batch as CSV: one row per image, numbers only, never the image."""
+    import csv
+    import io
+
+    out = io.StringIO()
+    writer = csv.writer(out, lineterminator="\n")
+    low, high = result["low_T"], result["high_T"]
+    writer.writerow(["file", "prediction", "probability_T1",
+                     f"probability_T{low:g}", f"probability_T{high:g}", "logit",
+                     "uncertain"])
+    for r in result["rows"]:
+        writer.writerow([r["file"], r["prediction"],
+                         f"{r['probability_calibrated']:.4f}",
+                         f"{r['probability_low_T']:.4f}", f"{r['probability_high_T']:.4f}",
+                         f"{r['logit']:.4f}", "yes" if r["uncertain"] else "no"])
+    return out.getvalue()
+
+
+def report_markdown(result: dict, context: dict) -> str:
+    """A short summary: settings, counts, the table, the limits. Never the images.
+
+    ``context`` names the run, the reference condition, its fitted temperature and
+    τ, so a reader can trace every number to the run that produced the model.
+    """
+    s = result["summary"]
+    low, high = result["low_T"], result["high_T"]
+    lines = [
+        "# ScoutField leaf analysis",
+        "",
+        (f"Classifier: EfficientNet-B0 exported to ONNX, run `{context['run_id']}`. "
+         "Probabilities are calibrated with the temperature fitted on held-out field "
+         f"photographs ({context['reference_condition']}, "
+         f"{context['fitted_temperature']:.4f}). T = 1 is that calibrated probability; "
+         f"T = {low:g} and T = {high:g} show the same image made overconfident and "
+         "underconfident, as in the experiment. The prediction comes from the sign of "
+         "the logit, so it does not change with T."),
+        "",
+        ("An image is marked uncertain when its calibrated probability lies between "
+         f"{1 - context['tau']:g} and {context['tau']:g}, where {context['tau']:g} is the "
+         "confirmation threshold the planners use."),
+        "",
+        "## Summary",
+        "",
+        s["sentence"],
+        "",
+        "## Images",
+        "",
+        (f"| File | Prediction | P(diseased), T = 1 | T = {low:g} | T = {high:g} "
+         "| Logit | Uncertain |"),
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for r in result["rows"]:
+        name = r["file"].replace("|", "\\|")
+        lines.append(f"| {name} | {r['prediction']} | {r['probability_calibrated']:.4f} "
+                     f"| {r['probability_low_T']:.4f} | {r['probability_high_T']:.4f} "
+                     f"| {r['logit']:+.4f} | {'yes' if r['uncertain'] else 'no'} |")
+    if result["rejected"]:
+        lines += ["", "## Not analysed", ""] + [f"- {reason}" for reason in result["rejected"]]
+    lines += ["", "## Limits", ""] + [f"- {text}" for text in LIMITS_TEXT]
+    lines += ["", "## Privacy", "", PRIVACY_TEXT, "",
+              f"Method and results: {context['repository_url']}", ""]
+    return "\n".join(lines)
 
 
 # ------------------------------------------------------------------ samples
