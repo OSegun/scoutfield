@@ -309,8 +309,9 @@ which prints the table it chose from.
 
 ### Hosted: Streamlit Community Cloud
 
-The public backup. Community Cloud deploys `scoutfield/app/streamlit_app.py` from the
-GitHub repository, branch `main`, on Python 3.12, and installs
+Live at <https://scoutfield.streamlit.app/>. Community Cloud deploys
+`scoutfield/app/streamlit_app.py` from the GitHub repository, branch `main`, on Python
+3.12, and redeploys after every push to `main`. It installs
 `scoutfield/app/requirements.txt`, which sits beside the app and so takes precedence
 over the root `requirements.txt`. It reads the public store with no token or secret.
 Only the PlantDoc sample images are offered there. Limits: about 1 GB of memory (the app

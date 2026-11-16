@@ -516,6 +516,9 @@ shows the measured result. The field is labelled as simulated. Sample images are
 PlantDoc (CC BY 4.0, credited on the page) and, on the laptop only, PlantVillage (CC
 BY-NC-SA 4.0).
 
+A hosted copy runs on Streamlit Community Cloud at <https://scoutfield.streamlit.app/>;
+its limits are in `docs/REPRODUCING.md`, section "7. Running the demonstration".
+
 ---
 
 ## 7. Where results live

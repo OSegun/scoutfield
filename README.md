@@ -22,6 +22,10 @@ pilot's effect was real or an artefact of the surrogate.
 > The classifier's ONNX latency is measured on a laptop; uncertainty methods are not yet
 > run. Nothing here has been peer-reviewed.
 >
+> **Live demonstration: <https://scoutfield.streamlit.app/>** (Streamlit Community Cloud).
+> It sleeps after 12 hours without visitors; the first visit after that wakes it, which
+> takes up to a minute.
+>
 > The **completed** work is the pilot study: 195 executed runs and 8 figures, frozen in the
 > companion repository [**scoutplan**](https://github.com/OSegun/scoutplan)
 > and pinned here at `v1.0.0`. This repository extends it; it does not replace it.
@@ -55,7 +59,7 @@ and it needs no budget.
 | 6. τ sensitivity | implemented |
 | 7. MC-dropout, deep ensembles, reliability diagrams | **partial**: reliability diagrams drawn (Figure 9); MC-dropout and deep ensembles not run |
 | 8. Oracle planner; regret | implemented |
-| 9. ONNX export, latency, deployed interface | **partial**: classifier and PPO policy exported and verified; latency measured on a laptop CPU; demonstration runs offline on a laptop; hosted copies not yet deployed |
+| 9. ONNX export, latency, deployed interface | **partial**: classifier and PPO policy exported and verified; latency measured on a laptop CPU; demonstration live on Streamlit Community Cloud at <https://scoutfield.streamlit.app/> and runs offline on a laptop; Google Cloud Run copy not yet deployed |
 
 Results are in [`docs/RESULTS.md`](docs/RESULTS.md). Every number there is read from the
 files in `results/`, which are copies of one run's outputs; if the two disagree, the
@@ -172,14 +176,17 @@ Same commands via `make train-perception`, `make calibrate`, `make train-ppo`, `
 sweep`, `make tau`, `make figures`.
 
 The demonstration, three panels showing the coupling under the conditions the experiment
-measured (settings in `configs/deployment.yaml`):
+measured, is live at <https://scoutfield.streamlit.app/>. It reads the public artefact
+store and offers only the PlantDoc sample images. To run it yourself (settings in
+`configs/deployment.yaml`):
 
 ```bash
 make app            # reads the public artefact store
 make demo-fill      # once, online: copies what the app reads into .demo_offline/
 make app-offline    # reads only that folder; runs with the network off
-``` Reproducing any specific number:
-[`docs/REPRODUCING.md`](docs/REPRODUCING.md).
+```
+
+Reproducing any specific number: [`docs/REPRODUCING.md`](docs/REPRODUCING.md).
 
 ---
 
@@ -265,13 +272,13 @@ scoutfield/
 ├── docs/                       METHOD.md · REPRODUCING.md · RESULTS.md
 ├── tests/                      contract tests against the pinned pilot
 ├── results/  figures/          one run's final outputs, copied from the artefact store
-└── checkpoints/                generated locally, untracked
+└── checkpoints/                created locally, untracked
 ```
 
 `docs/METHOD.md` lists every hyperparameter and the citation behind it, so the
 implementation can be checked against the method without reading the code.
 `docs/REPRODUCING.md` maps each reported number to the exact command that produces it.
-`docs/RESULTS.md` holds the numbers themselves and is written *from* the generated summary
+`docs/RESULTS.md` holds the numbers themselves and is written *from* the summary
 files.
 
 ---
@@ -294,8 +301,8 @@ subprocess.run(["git", "clone", "--depth", "1", REPO, "/kaggle/working/scoutfiel
 #   pip install -e . --no-deps
 ```
 
-The cell is generated, not hand-written — see `notebooks/_bootstrap.py` and
-`configs/kaggle.yaml`.
+The notebooks are in `notebooks/`; the cell above is `notebooks/_bootstrap.py`, with its
+settings in `configs/kaggle.yaml`.
 
 Internet **on**, accelerator **GPU T4 x2** (None for the CPU-only sweep notebook), and the
 `HF_TOKEN` secret attached to each notebook. Sessions are
@@ -325,7 +332,7 @@ Ordered by dependency. Each item names how you know it is done. ✅ done, result
 | 6 | τ sensitivity | effect size reported as a curve over τ, not a single number | ✅ |
 | 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis | ◐ |
 | 8 | Oracle planner; regret | every planner's gap to the ground-truth ceiling quantified | ✅ |
-| 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated | ◐ |
+| 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated | ◐ demonstration live at <https://scoutfield.streamlit.app/>; Cloud Run copy not yet deployed |
 
 **Standing risks.** Reward shaping can consume weeks — the reward is frozen and swept only
 if a result demands it. Simulator realism will be challenged in review, so every physical
@@ -341,12 +348,12 @@ Inherited from the pilot, and the reason its numbers held up.
    not a result.
 2. **Baselines get the same observation and pay the same energy.** Never advantage the
    proposed method through the interface.
-3. **No number is hard-coded into a document.** Results are read from generated summary
+3. **No number is hard-coded into a document.** Results are read from summary
    files, so text and data cannot drift apart.
 4. **Negative results are reported.** The pilot published two refuted hypotheses and an
    underperforming agent. That standard holds here.
-5. **Generated artefacts are never hand-edited.** A wrong figure means wrong code or
-   wrong data.
+5. **Results and figures are written only by the code that produces them, never by
+   hand.** A wrong figure means wrong code or wrong data.
 
 ---
 
@@ -364,7 +371,8 @@ Cite this repository, the release a number appears in, and the run it comes from
   version = {0.2.0},
   url     = {https://github.com/OSegun/scoutfield},
   note    = {Research engineering project, Miva Open University.
-             Supervisor: Dr. Chukwuemeka Odi Agwu. Results: run r2026-11-13}
+             Supervisor: Dr. Chukwuemeka Odi Agwu. Results: run r2026-11-13
+             in the Hugging Face artefact store}
 }
 ```
 
