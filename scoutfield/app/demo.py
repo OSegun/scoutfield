@@ -343,7 +343,7 @@ def choose_seed(summary: dict, settings: DemoSettings, pool, reference_temperatu
 # ------------------------------------------------------- a visitor's own images
 #
 # The "Analyse your leaves" panel. Every image goes through the deployed path
-# unchanged (``ScoutPlanInference.preprocess`` and ``.predict``), and nothing a
+# unchanged (``ScoutFieldInference.preprocess`` and ``.predict``), and nothing a
 # visitor uploads is written anywhere: files are read from bytes in memory, and the
 # report is returned as text for the page to offer as a download.
 
@@ -638,3 +638,123 @@ def find_image(dataset_root: Path, key: str) -> Path:
             if candidate.parts[-3:-1] == parts[-3:-1]:
                 return candidate
     raise FileNotFoundError(f"{key} not found under {dataset_root}")
+
+
+# ------------------------------------------------- deployed path vs stage 02
+
+def compare_sample_logits(model, samples: list[dict], atol: float) -> dict:
+    """Each sample's logit on the deployed path against the logit stage 02 recorded.
+
+    ``samples`` are entries of a ``demo_samples.json`` listing, each with its
+    ``path`` added. Stage 02 scored the same photograph with PyTorch from the
+    training code's transform; here it goes through ``eval_array`` and the exported
+    graph, so a difference would expose a preprocessing or export mismatch on real
+    imagery. The check passes when every logit is within ``atol`` and every
+    prediction (the logit's sign) agrees.
+    """
+    rows = []
+    for s in samples:
+        got = float(model.predict(Path(s["path"]))["logit"])
+        recorded = float(s["logit"])
+        rows.append({"store_name": s["store_name"], "dataset": s["dataset"],
+                     "key": s["key"], "stage02_logit": recorded, "deployed_logit": got,
+                     "abs_difference": abs(got - recorded),
+                     "same_prediction": (got > 0) == (recorded > 0)})
+    worst = max((r["abs_difference"] for r in rows), default=None)
+    return {"n_samples": len(rows), "max_abs_difference": worst, "logit_atol": float(atol),
+            "passed": bool(rows) and worst <= atol and all(r["same_prediction"] for r in rows),
+            "samples": rows}
+
+
+def _listed_samples(folder: Path, listing: str) -> list[dict]:
+    import json
+
+    path = folder / listing
+    if not path.is_file():
+        return []
+    with path.open("r", encoding="utf-8") as fh:
+        entries = json.load(fh)["samples"]
+    return [{**s, "path": folder / s["store_name"]} for s in entries]
+
+
+def run_sample_check(config=None, store=None, push: bool = False) -> dict:
+    """Check every demonstration sample available here and write the record.
+
+    The PlantDoc samples come from stage ``08_deployment`` of the store; the
+    PlantVillage samples, which may not be published there, from this machine's
+    ``samples_local`` folder (written by experiments/08_select_samples.py), if it
+    exists. The record names the source of each group. ``push`` files the record in
+    the stage, refused unless the classifier checked is the one filed there, the
+    check passed, and the working tree is committed.
+    """
+    import json
+    import platform
+    from datetime import datetime, timezone
+
+    import onnxruntime as ort
+
+    from scoutfield.app.export_onnx import git_state, locate_classifier, work_dir
+    from scoutfield.app.inference import ScoutFieldInference
+    from scoutfield.utils.artifacts import get_store, sha256_of
+
+    config = config or deployment_config()
+    store = store or get_store()
+    stage = str(config["stage"])
+    listing = str(config.section("demo")["samples"]["file"])
+    onnx_path, source = locate_classifier(config, store)
+    model = ScoutFieldInference(onnx_path)
+
+    samples, sources = [], {}
+    files = sample_files(store, config)
+    if files:
+        public = [{**s, "path": store.pull(stage, s["store_name"])}
+                  for s in store.pull_json(stage, listing)["samples"]]
+        samples += public
+        sources["store"] = {"n": len(public), "where": store.remote_path(stage, listing)}
+    local_dir = work_dir(config, store.run_id) / "samples_local"
+    local = _listed_samples(local_dir, listing)
+    samples += local
+    if local:
+        sources["laptop_only"] = {"n": len(local), "where": str(local_dir.name),
+                                  "note": "licence keeps these images out of the "
+                                          "public store; their logits are recorded here"}
+    if not samples:
+        raise FileNotFoundError(
+            f"no demonstration samples: looked in {store.remote_path(stage, listing)} "
+            f"and in {local_dir}. Run `python experiments/08_select_samples.py` first.")
+
+    atol = float(config.section("export")["verify"]["logit_atol"])
+    check = compare_sample_logits(model, samples, atol)
+    record = {
+        "run_id": store.run_id,
+        "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "what": "demonstration sample photographs through the deployed path (NumPy and "
+                "Pillow preprocessing, ONNX Runtime on the CPU) against the logit stage "
+                "02 recorded for the same photograph (PyTorch, from the stored logit pool)",
+        "onnx": {"file": onnx_path.name, "sha256": sha256_of(onnx_path), "source": source},
+        "sample_sources": sources,
+        **check,
+        **git_state(),
+        "versions": {"python": platform.python_version(), "onnxruntime": ort.__version__,
+                     "numpy": np.__version__},
+    }
+    out = work_dir(config, store.run_id) / str(config.section("demo")["sample_check_file"])
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as fh:
+        json.dump(record, fh, indent=2)
+
+    if push:
+        filed = store.stage_entry(stage).get("files", {}) \
+            .get(config.section("export")["classifier_file"], {}).get("sha256")
+        if filed != record["onnx"]["sha256"]:
+            raise ValueError(
+                f"refusing to push: the classifier checked is not the classifier.onnx "
+                f"filed in {stage} of run {store.run_id}.")
+        if not record["passed"]:
+            raise ValueError(f"refusing to push a failed check (largest difference "
+                             f"{record['max_abs_difference']:.3g}, tolerance {atol:g}).")
+        if record["git_dirty"]:
+            raise ValueError("refusing to push a check made from uncommitted code; "
+                             "commit first so the record names the code that made it.")
+        store.push(stage, [out], "deployed-path logits of the demonstration samples")
+    return {"record": record, "path": out, "pushed": push}

@@ -1,6 +1,6 @@
 .PHONY: install install-dev test lint fmt clean \
         train-perception calibrate train-ppo sweep tau figures export-onnx latency \
-        export-policy demo-seed demo-samples demo-fill app app-offline
+        export-policy demo-seed demo-samples demo-logits demo-fill app app-offline
 
 PY ?= python
 
@@ -45,6 +45,9 @@ export-onnx:        ## 8. export the trained classifier to ONNX and verify it (n
 
 latency:            ## 8. time the exported classifier on this machine (no push)
 	$(PY) experiments/08_measure_latency.py --config configs/deployment.yaml
+
+demo-logits:        ## 8. compare demo samples' deployed-path logits with stage 02 (no push)
+	$(PY) experiments/08_check_demo_logits.py --config configs/deployment.yaml
 
 export-policy:      ## 8. export the PPO policy to ONNX and verify its actions (no push)
 	$(PY) experiments/08_export_policy.py --config configs/deployment.yaml

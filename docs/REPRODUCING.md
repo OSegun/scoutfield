@@ -52,6 +52,7 @@ a resumed sweep treats two different runs as the same completed job and skips on
 | 6 | `python experiments/make_figures.py` | under a minute | Figures 9–15 (stage `06_figures`); Figure 16 needs the uncertainty comparison and is not drawn |
 | 8 | `python experiments/08_export_onnx.py` | under a minute, CPU, laptop | `classifier.onnx`, `export_record.json` in `.artifact_cache/deployment/<run_id>/`; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_measure_latency.py` | about a minute, CPU, laptop | `deployment_latency.json` beside the export; stage `08_deployment` only with `--push` |
+| 8 | `python experiments/08_check_demo_logits.py` | under a minute, CPU, laptop | `demo_logit_check.json` beside the export; stage `08_deployment` only with `--push` |
 | 8 | `python experiments/08_export_policy.py` | about a minute, CPU, laptop | `policy_ppo_seed0.onnx`, `policy_export_record.json` beside the export; stage `08_deployment` only with `--push` |
 
 Runtimes are wall-clock times from run `r2026-11-13` on Kaggle: GPU T4 x2 for steps 0–3,
@@ -69,6 +70,14 @@ in the store. Once both are pushed, the promotion step copies `export_record.jso
 `deployment_latency.json` into `results/` and lists them in `results/RUN.json`, like
 every other result. A latency belongs to the machine it was measured on: re-running step
 8 elsewhere gives that machine's figure, not this one.
+
+`experiments/08_check_demo_logits.py` runs the demonstration's sample photographs
+through the deployed path and compares each logit with the one stage 02 recorded for the
+same photograph; it exits non-zero if any differs by more than the export tolerance or
+changes sign. The PlantVillage samples are included only on a machine that has them in
+`.artifact_cache/deployment/<run_id>/samples_local/`. Its `--push` is refused unless the
+classifier checked is the one filed in the store, the check passed, and the working tree
+is committed.
 
 `experiments/08_export_policy.py` exports the PPO policy trained with seed 0 for the
 demonstration, which runs it with ONNX Runtime alone. It flies PPO's own episodes in the

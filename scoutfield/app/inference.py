@@ -22,7 +22,7 @@ import numpy as np
 from scoutfield.app.export_onnx import INPUT_NAME, OUTPUT_NAME
 
 
-class ScoutPlanInference:
+class ScoutFieldInference:
     """Loads an exported model and returns calibrated probabilities."""
 
     def __init__(self, onnx_path: str | Path, temperature: float = 1.0,
@@ -46,7 +46,7 @@ class ScoutPlanInference:
     @classmethod
     def from_results(cls, onnx_path: str | Path, results_json: str | Path | None = None,
                      condition: str = "shift_fitted", store=None,
-                     **kwargs) -> ScoutPlanInference:
+                     **kwargs) -> ScoutFieldInference:
         """Build with the temperature that was actually fitted.
 
         A deployed model reporting raw sigmoid confidence is precisely the

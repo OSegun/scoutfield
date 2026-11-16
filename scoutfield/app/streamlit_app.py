@@ -91,11 +91,11 @@ def _resources(st):
 
     @st.cache_resource(show_spinner="Loading the classifier")
     def classifier():
-        from scoutfield.app.inference import ScoutPlanInference
+        from scoutfield.app.inference import ScoutFieldInference
 
         cfg = config()
         path = store().pull(str(cfg["stage"]), str(cfg.section("export")["classifier_file"]))
-        return ScoutPlanInference.from_results(
+        return ScoutFieldInference.from_results(
             path, condition=settings().reference_condition, store=store())
 
     @st.cache_resource(show_spinner="Loading the logit pool")

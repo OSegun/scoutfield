@@ -156,6 +156,14 @@ demo:
   # cells. The script prints the table it chose from.
   seed_candidates: 30
   default_seed: 28
+  # The demonstration's sample images run through the deployed path (NumPy and
+  # Pillow preprocessing, then classifier.onnx on the CPU) and compared with the
+  # logit stage 02 recorded for the same image (PyTorch on Kaggle's GPU, from the
+  # stored logit pool). Unlike the export check, these are real photographs, so the
+  # check covers decoding and preprocessing as well as the graph. The tolerance is
+  # export.verify.logit_atol, for the reason given there. Written by
+  # experiments/08_check_demo_logits.py.
+  sample_check_file: demo_logit_check.json
   # The "Analyse your leaves" panel: a visitor's own images, each through exactly the
   # deployed path (eval_array preprocessing, the exported classifier, the
   # shift-fitted temperature). Uploads are held in memory only: never written to

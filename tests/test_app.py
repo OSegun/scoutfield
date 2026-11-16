@@ -68,13 +68,13 @@ def test_inference_prediction_is_independent_of_temperature(exported):
     """The deployed path must preserve the invariance the study rests on."""
     from PIL import Image
 
-    from scoutfield.app.inference import ScoutPlanInference
+    from scoutfield.app.inference import ScoutFieldInference
 
     image = Image.fromarray(
         (np.random.default_rng(0).random((256, 256, 3)) * 255).astype("uint8")
     )
 
-    results = [ScoutPlanInference(exported["onnx"], temperature=T).predict(image)
+    results = [ScoutFieldInference(exported["onnx"], temperature=T).predict(image)
                for T in (0.3, 1.0, 4.0)]
 
     assert len({r["prediction"] for r in results}) == 1, "prediction moved with T"
@@ -86,20 +86,20 @@ def test_inference_prediction_is_independent_of_temperature(exported):
 def test_inference_probability_is_a_probability(exported):
     from PIL import Image
 
-    from scoutfield.app.inference import ScoutPlanInference
+    from scoutfield.app.inference import ScoutFieldInference
 
     image = Image.fromarray(np.zeros((224, 224, 3), dtype="uint8"))
-    out = ScoutPlanInference(exported["onnx"], temperature=1.7).predict(image)
+    out = ScoutFieldInference(exported["onnx"], temperature=1.7).predict(image)
     assert 0.0 <= out["probability"] <= 1.0
     assert out["prediction"] in (0, 1)
     assert out["temperature"] == 1.7
 
 
 def test_inference_fails_loudly_without_an_exported_model(tmp_path):
-    from scoutfield.app.inference import ScoutPlanInference
+    from scoutfield.app.inference import ScoutFieldInference
 
     with pytest.raises(FileNotFoundError, match="export_onnx"):
-        ScoutPlanInference(tmp_path / "absent.onnx")
+        ScoutFieldInference(tmp_path / "absent.onnx")
 
 
 def test_export_rejects_a_graph_that_differs_from_the_model(exported, tmp_path):
@@ -231,12 +231,12 @@ def test_panel1_slider_at_one_gives_the_calibrated_probability(exported, tmp_pat
 
     from PIL import Image
 
-    from scoutfield.app.inference import ScoutPlanInference
+    from scoutfield.app.inference import ScoutFieldInference
 
     results = tmp_path / "calibration_sweep.json"
     results.write_text(json.dumps({"shift_fitted_temperature": FITTED,
                                    "lab_fitted_temperature": 0.99}), encoding="utf-8")
-    model = ScoutPlanInference.from_results(exported["onnx"], results_json=results,
+    model = ScoutFieldInference.from_results(exported["onnx"], results_json=results,
                                             condition="shift_fitted")
     image = Image.fromarray((np.random.default_rng(1).random((240, 240, 3)) * 255)
                             .astype("uint8"))
@@ -431,7 +431,7 @@ def test_offline_folder_runs_the_demo_with_the_store_unreachable(store, tmp_path
     from PIL import Image
 
     from scoutfield.app import demo
-    from scoutfield.app.inference import ScoutPlanInference
+    from scoutfield.app.inference import ScoutFieldInference
     from scoutfield.utils import artifacts
 
     _full_source_store(store, tmp_path)
@@ -456,7 +456,7 @@ def test_offline_folder_runs_the_demo_with_the_store_unreachable(store, tmp_path
     settings = demo.load_settings()
     pool = demo.load_pool(settings.pool_split, store=offline)
     reference = demo.fitted_temperature(settings.reference_condition, store=offline)
-    model = ScoutPlanInference.from_results(
+    model = ScoutFieldInference.from_results(
         offline.pull("08_deployment", "classifier.onnx"), condition="shift_fitted",
         store=offline)
     out = model.predict(Image.new("RGB", (300, 260), (120, 160, 90)))
@@ -577,9 +577,9 @@ def _image_bytes(value: int, size=(64, 48), fmt="PNG") -> bytes:
 
 @pytest.fixture()
 def leaf_model(tmp_path):
-    from scoutfield.app.inference import ScoutPlanInference
+    from scoutfield.app.inference import ScoutFieldInference
 
-    return ScoutPlanInference(_tiny_classifier(tmp_path / "tiny.onnx"),
+    return ScoutFieldInference(_tiny_classifier(tmp_path / "tiny.onnx"),
                               temperature=LEAF_FITTED)
 
 
@@ -756,3 +756,34 @@ def test_analysing_uploads_writes_nothing_to_disk(leaf_model, monkeypatch, tmp_p
     assert writes == []
     assert [p.name for p in tmp_path.iterdir()] == ["tiny.onnx"]
     assert set(os.listdir(tempfile.gettempdir())) - temp_before == set()
+
+
+def test_sample_check_compares_the_deployed_path_with_stage02(leaf_model, tmp_path):
+    """A recorded logit off by more than the tolerance, or of the other sign, fails."""
+    import io
+
+    from PIL import Image
+
+    from scoutfield.app.demo import compare_sample_logits
+
+    samples = []
+    for i, value in enumerate((255, 0)):
+        path = tmp_path / f"s{i}.png"
+        path.write_bytes(_image_bytes(value))
+        logit = leaf_model.predict(Image.open(io.BytesIO(path.read_bytes())))["logit"]
+        samples.append({"store_name": path.name, "dataset": "plantdoc", "key": f"k/{i}",
+                        "logit": logit, "path": path})
+
+    good = compare_sample_logits(leaf_model, samples, atol=1e-4)
+    assert good["passed"] and good["n_samples"] == 2
+    assert good["max_abs_difference"] < 1e-6
+
+    off = [dict(samples[0], logit=samples[0]["logit"] + 1e-3), samples[1]]
+    assert not compare_sample_logits(leaf_model, off, atol=1e-4)["passed"]
+
+    flipped = [dict(samples[0], logit=-samples[0]["logit"]), samples[1]]
+    result = compare_sample_logits(leaf_model, flipped, atol=1e3)
+    assert not result["passed"]
+    assert result["samples"][0]["same_prediction"] is False
+
+    assert not compare_sample_logits(leaf_model, [], atol=1e-4)["passed"]

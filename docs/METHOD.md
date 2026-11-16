@@ -485,6 +485,16 @@ Every measurement records the machine, read from the system rather than typed: C
 model, physical and logical cores, RAM, operating system, whether a laptop was on mains
 power (on battery the CPU is throttled), and the ONNX Runtime and Python versions.
 
+### The deployed path on real photographs
+
+The export check uses seeded random inputs, so it tests the graph but not image decoding
+or preprocessing. `experiments/08_check_demo_logits.py` closes that gap on real imagery:
+every demonstration sample photograph goes through the deployed path (NumPy and Pillow
+preprocessing, then the exported classifier on the CPU) and its logit is compared with
+the logit stage 02 recorded for the same photograph with PyTorch. The tolerance is the
+export's, 1e-4, and every prediction must agree. The record is
+`demo_logit_check.json` (setting `demo.sample_check_file`).
+
 ### The PPO policy, exported
 
 For the demonstration the PPO policy trained with seed 0 (`policy` in
