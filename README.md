@@ -175,10 +175,13 @@ python experiments/make_figures.py
 Same commands via `make train-perception`, `make calibrate`, `make train-ppo`, `make
 sweep`, `make tau`, `make figures`.
 
-The demonstration, three panels showing the coupling under the conditions the experiment
-measured, is live at <https://scoutfield.streamlit.app/>. It reads the public artefact
-store and offers only the PlantDoc sample images. To run it yourself (settings in
-`configs/deployment.yaml`):
+The demonstration is live at <https://scoutfield.streamlit.app/>. Three panels show the
+coupling under the conditions the experiment measured; a fourth, "Analyse your leaves",
+runs your own leaf photographs through the deployed classifier and gives a downloadable
+report. Uploads are processed in memory and never saved. The classifier tells healthy
+from diseased only, names no disease, and is not a diagnosis. The hosted copy reads the
+public artefact store and offers only the PlantDoc sample images. To run it yourself
+(settings in `configs/deployment.yaml`):
 
 ```bash
 make app            # reads the public artefact store

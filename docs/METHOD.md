@@ -516,6 +516,31 @@ shows the measured result. The field is labelled as simulated. Sample images are
 PlantDoc (CC BY 4.0, credited on the page) and, on the laptop only, PlantVillage (CC
 BY-NC-SA 4.0).
 
+**Analyse your leaves.** A fourth panel takes a visitor's own photographs and runs each
+through the same deployed path: the same preprocessing, the exported classifier and the
+shift-fitted temperature. Settings are under `demo.upload`.
+
+| Element | Rule | Why |
+| --- | --- | --- |
+| Per image | prediction, calibrated probability at T = 1, the probability at the lowest and highest T of the sweep (0.3 and 4), the raw logit | the instrument shown on the visitor's own image: the prediction stays, the confidence moves |
+| Uncertain | calibrated probability strictly between 1 − τ and τ (0.25 and 0.75 at τ = 0.75, read from `configs/ppo_field32.yaml`) | the planners confirm a cell at τ, so an image in this band is one a planner would confirm neither way |
+| Batch summary | counts by prediction, the uncertain share, one sentence on what the classifier can and cannot say | the visitor reads the batch, not only single images |
+| Report | CSV of the numbers, and a Markdown summary with the run, the fitted temperature, τ, the table, the limits and the privacy statement | numbers and stated limits, never the images |
+| Limits per batch | 10 files, 10 MB each, 24 megapixels each (checked from the file header before decoding) | bounds memory; files beyond a limit are refused by name |
+| Privacy | images read from memory, never written to disk or to the store; one full-size image decoded at a time across all visitors | stated on the page; a test asserts that analysing a batch opens no file for writing |
+
+The stated limits, on the page and in the report: two classes only, with no disease
+name or severity; trained on PlantVillage laboratory images and calibrated on held-out
+PlantDoc field images; not a diagnosis; and any image gets a prediction, including one
+that shows no leaf. The panel is an interface to the trained classifier, not a
+measurement: its outputs are not part of the reported results.
+
+Memory, measured on the laptop of `docs/RESULTS.md`, section "8. Deployment", running
+from the store: 221 MB after the page loads, and a peak working set of 524 MB with the
+worst batch the limits allow (ten 24-megapixel JPEGs of 9.1 MB each). Visitors on a
+hosted copy share one process; a second visitor at the same moment adds their uploaded
+files (up to 100 MB), but no second full-size decoded image.
+
 A hosted copy runs on Streamlit Community Cloud at <https://scoutfield.streamlit.app/>;
 its limits are in `docs/REPRODUCING.md`, section "7. Running the demonstration".
 

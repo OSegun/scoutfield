@@ -267,8 +267,11 @@ goes and resumes from there, as described above.
 
 ## 7. Running the demonstration
 
-`scoutfield/app/streamlit_app.py` is one app with three panels: Classify, Plan and
-Compare. It shows what the experiment measured, under the conditions it measured. Every
+`scoutfield/app/streamlit_app.py` is one app with four panels: Classify, Plan, Compare
+and Analyse your leaves. The first three show what the experiment measured, under the
+conditions it measured. The fourth runs a visitor's own photographs through the same
+deployed classifier and offers a report (CSV and Markdown) to download; uploads stay in
+memory and are never saved, and its limits are under `demo.upload`. Every
 setting is in `configs/deployment.yaml` under `demo`, and every file it reads comes
 from the artefact store, by one code path. Where that store is depends on one setting:
 `demo.source`, overridden by the environment variable `SCOUTFIELD_DEMO_SOURCE`.
@@ -315,7 +318,9 @@ Live at <https://scoutfield.streamlit.app/>. Community Cloud deploys
 `scoutfield/app/requirements.txt`, which sits beside the app and so takes precedence
 over the root `requirements.txt`. It reads the public store with no token or secret.
 Only the PlantDoc sample images are offered there. Limits: about 1 GB of memory (the app
-peaks near 230 MB); the app sleeps after 12 hours without visitors and wakes on the next
+holds about 220 MB once loaded, and peaked at 524 MB with the largest upload batch the
+limits allow, measured on a laptop; `docs/METHOD.md`, section "6. Deployment",
+subsection "The demonstration"); the app sleeps after 12 hours without visitors and wakes on the next
 visit, which takes up to a minute.
 
 ### Hosted: Google Cloud Run
