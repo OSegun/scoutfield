@@ -306,3 +306,41 @@ $env:SCOUTFIELD_DEMO_SOURCE = "offline"; python -m streamlit run scoutfield/app/
 If the folder is empty, the page says so and names the fill command. The default
 evaluation seed of the Plan panel is chosen by `experiments/08_choose_demo_seed.py`,
 which prints the table it chose from.
+
+### Hosted: Streamlit Community Cloud
+
+The public backup. Community Cloud deploys `scoutfield/app/streamlit_app.py` from the
+GitHub repository, branch `main`, on Python 3.12, and installs
+`scoutfield/app/requirements.txt`, which sits beside the app and so takes precedence
+over the root `requirements.txt`. It reads the public store with no token or secret.
+Only the PlantDoc sample images are offered there. Limits: about 1 GB of memory (the app
+peaks near 230 MB); the app sleeps after 12 hours without visitors and wakes on the next
+visit, which takes up to a minute.
+
+### Hosted: Google Cloud Run
+
+The fallback, from the container defined by `Dockerfile` (with `.dockerignore`, which
+admits only `scoutfield/`, `configs/` and `LICENSE`). Built and run locally first:
+
+```bash
+docker build -t scoutfield-demo .
+docker run --rm -p 8080:8080 scoutfield-demo
+```
+
+The app is then at `http://localhost:8080`. On Cloud Run it listens on the port in the
+`PORT` environment variable. A deployment from source:
+
+```bash
+gcloud run deploy scoutfield-demo --source . --region <region> --memory 1Gi --cpu 1 --allow-unauthenticated --min-instances 0 --session-affinity --timeout 3600
+```
+
+`--min-instances 0` lets the service scale to nothing when idle, so it costs nothing
+then; the first visit afterwards waits while a container starts (a cold start).
+`--session-affinity` keeps a viewer's Streamlit connection on one container, and
+`--timeout 3600` keeps that connection open for up to an hour. Cloud Run's free tier
+still requires a billing account.
+
+### Considered and not used
+
+An always-free virtual machine on Oracle Cloud was considered and not used: it is a
+self-managed server, which is more upkeep than a demonstration needs.
