@@ -142,6 +142,22 @@ def deployment_config():
     return load_deployment_config()
 
 
+def config_stamp(repo: Path | None = None) -> str:
+    """SHA-256 over every file in ``configs/``, names and contents, in name order.
+
+    The page's caches take this as an argument, so that a config file changed by a
+    redeploy is a new cache key rather than a setting the running app never sees.
+    """
+    import hashlib
+
+    from scoutfield.utils.paths import repo_root
+
+    digest = hashlib.sha256()
+    for path in sorted(((repo or repo_root()) / "configs").glob("*.yaml")):
+        digest.update(path.name.encode("utf-8") + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
 def demo_source(config=None) -> str:
     """``store`` or ``offline``: the environment variable, else the config value."""
     import os
@@ -376,7 +392,13 @@ class UploadLimits:
     @classmethod
     def from_config(cls, config=None) -> UploadLimits:
         config = config or deployment_config()
-        up = config.section("demo")["upload"]
+        demo = config.section("demo")
+        if "upload" not in demo:
+            raise KeyError(
+                f"{config.path} has no demo.upload section. The leaf-upload panel reads "
+                "its limits from there; a running app that loaded an older copy of the "
+                "file must be restarted to read the current one.")
+        up = demo["upload"]
         return cls(int(up["max_files"]), float(up["max_file_mb"]),
                    float(up["max_megapixels"]), int(up["thumbnail_px"]))
 

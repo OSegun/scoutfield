@@ -787,3 +787,52 @@ def test_sample_check_compares_the_deployed_path_with_stage02(leaf_model, tmp_pa
     assert result["samples"][0]["same_prediction"] is False
 
     assert not compare_sample_logits(leaf_model, [], atol=1e-4)["passed"]
+
+
+# ------------------------------------------- demonstration: config and caches
+#
+# The hosted app once raised KeyError on demo.upload after a redeploy: the page's
+# cache was keyed on the loader's code, not on the YAML it read, so it kept serving
+# the config loaded before the setting existed.
+
+def test_config_stamp_follows_the_config_files(tmp_path):
+    from scoutfield.app.demo import config_stamp
+
+    (tmp_path / "configs").mkdir()
+    yaml_file = tmp_path / "configs" / "deployment.yaml"
+    yaml_file.write_text("demo: {}\n", encoding="utf-8")
+    first = config_stamp(tmp_path)
+    assert config_stamp(tmp_path) == first
+    yaml_file.write_text("demo: {upload: {max_files: 10}}\n", encoding="utf-8")
+    assert config_stamp(tmp_path) != first
+
+
+def test_the_page_reloads_its_config_when_the_files_change(monkeypatch):
+    """Same code, new config files: the cached config must be read again."""
+    import streamlit as st
+
+    from scoutfield.app import demo, streamlit_app
+
+    reads = []
+    monkeypatch.setattr(demo, "deployment_config",
+                        lambda: reads.append(len(reads)) or {"read": len(reads)})
+    st.cache_resource.clear()
+    st.cache_data.clear()
+
+    monkeypatch.setattr(demo, "config_stamp", lambda: "before")
+    first = streamlit_app._resources(st)["config"]()
+    assert streamlit_app._resources(st)["config"]() is first      # cached
+    monkeypatch.setattr(demo, "config_stamp", lambda: "after")
+    second = streamlit_app._resources(st)["config"]()
+    assert second is not first and len(reads) == 2                # read again
+    st.cache_resource.clear()
+
+
+def test_a_missing_upload_section_is_named(tmp_path):
+    from scoutfield.app.demo import UploadLimits
+    from scoutfield.config import load_config
+
+    path = tmp_path / "deployment.yaml"
+    path.write_text("demo: {page_title: x}\n", encoding="utf-8")
+    with pytest.raises(KeyError, match="demo.upload.*restarted"):
+        UploadLimits.from_config(load_config(path))

@@ -74,64 +74,79 @@ PLANNER_STYLES = {"oracle": "--"}
 # --------------------------------------------------------------- resources
 
 def _resources(st):
-    """Everything read once per server process and shared by every session."""
+    """Everything read once per server process and shared by every session.
+
+    Every cached loader takes ``stamp``, a fingerprint of the config files the app
+    reads (``demo.config_stamp``). Streamlit keys its caches on a function's code
+    and arguments, not on the files the function reads, so without the stamp a
+    hosted app that redeploys after a config change keeps serving the config it
+    loaded before: a setting added to a YAML file is then missing at run time. With
+    it, a changed config file is a new cache key and everything is reloaded.
+    """
     from scoutfield.app import demo
 
+    stamp = demo.config_stamp()
+
     @st.cache_resource(show_spinner=False)
-    def config():
+    def _config(stamp: str):
         return demo.deployment_config()
 
     @st.cache_resource(show_spinner="Opening the artefact store")
-    def store():
-        return demo.open_store(config())
+    def _store(stamp: str):
+        return demo.open_store(_config(stamp))
 
     @st.cache_resource(show_spinner=False)
-    def settings():
+    def _settings(stamp: str):
         return demo.load_settings()
 
     @st.cache_resource(show_spinner="Loading the classifier")
-    def classifier():
+    def _classifier(stamp: str):
         from scoutfield.app.inference import ScoutFieldInference
 
-        cfg = config()
-        path = store().pull(str(cfg["stage"]), str(cfg.section("export")["classifier_file"]))
+        cfg, store = _config(stamp), _store(stamp)
+        path = store.pull(str(cfg["stage"]), str(cfg.section("export")["classifier_file"]))
         return ScoutFieldInference.from_results(
-            path, condition=settings().reference_condition, store=store())
+            path, condition=_settings(stamp).reference_condition, store=store)
 
     @st.cache_resource(show_spinner="Loading the logit pool")
-    def pool():
-        return demo.load_pool(settings().pool_split, store=store())
+    def _pool(stamp: str):
+        return demo.load_pool(_settings(stamp).pool_split, store=_store(stamp))
 
     @st.cache_resource(show_spinner=False)
-    def reference_temperature():
-        return demo.fitted_temperature(settings().reference_condition, store=store())
+    def _reference_temperature(stamp: str):
+        return demo.fitted_temperature(_settings(stamp).reference_condition,
+                                       store=_store(stamp))
 
     @st.cache_resource(show_spinner="Loading the PPO policy")
-    def policy():
-        return demo.load_policy(store(), config())
+    def _policy(stamp: str):
+        return demo.load_policy(_store(stamp), _config(stamp))
 
     @st.cache_data(show_spinner=False)
-    def summary():
-        cfg = config().section("demo")["summary"]
-        return store().pull_json(str(cfg["stage"]), str(cfg["name"]))
+    def _summary(stamp: str):
+        cfg = _config(stamp).section("demo")["summary"]
+        return _store(stamp).pull_json(str(cfg["stage"]), str(cfg["name"]))
 
     @st.cache_data(show_spinner=False)
-    def samples():
+    def _samples(stamp: str):
         """Sample images: those filed in the store, then laptop-only ones."""
+        cfg, store = _config(stamp), _store(stamp)
         out = []
-        files = demo.sample_files(store(), config())
+        files = demo.sample_files(store, cfg)
         if files:
             stage, listing = files[0]
-            for s in store().pull_json(stage, listing)["samples"]:
-                out.append({**s, "path": str(store().pull(stage, s["store_name"]))})
-        if demo.demo_source(config()) == "offline":
-            out += [{**s, "path": str(s["path"])} for s in demo.local_samples(config())]
+            for s in store.pull_json(stage, listing)["samples"]:
+                out.append({**s, "path": str(store.pull(stage, s["store_name"]))})
+        if demo.demo_source(cfg) == "offline":
+            out += [{**s, "path": str(s["path"])} for s in demo.local_samples(cfg)]
         return out
 
-    return {"config": config, "store": store, "settings": settings,
-            "classifier": classifier, "pool": pool,
-            "reference_temperature": reference_temperature, "policy": policy,
-            "summary": summary, "samples": samples}
+    loaders = {"config": _config, "store": _store, "settings": _settings,
+               "classifier": _classifier, "pool": _pool,
+               "reference_temperature": _reference_temperature, "policy": _policy,
+               "summary": _summary, "samples": _samples}
+    res = {name: (lambda f=f: f(stamp)) for name, f in loaders.items()}
+    res["stamp"] = stamp
+    return res
 
 
 def _check_store(st, res) -> bool:
@@ -267,7 +282,8 @@ def _plan_runs(st, res, temperature: float, tau: float, seed: int) -> dict:
     from scoutfield.app import demo
 
     @st.cache_data(show_spinner="Flying the three planners", max_entries=64)
-    def runs(temperature: float, tau: float, seed: int) -> dict:
+    def runs(temperature: float, tau: float, seed: int, stamp: str) -> dict:
+        # `stamp` is unused in the body: it makes a config change a new cache key.
         settings, pool = res["settings"](), res["pool"]()
         reference, policy = res["reference_temperature"](), res["policy"]()
         out = {}
@@ -281,7 +297,7 @@ def _plan_runs(st, res, temperature: float, tau: float, seed: int) -> dict:
                          "truth": np.asarray(env.field.labels)}
         return out
 
-    return runs(temperature, tau, seed)
+    return runs(temperature, tau, seed, res["stamp"])
 
 
 def _path_figure(run, title):
@@ -367,7 +383,7 @@ def _compare_panel(st, res) -> None:
                 "ratio": ("no detections at the high T" if ratio is None
                           else f"{ratio:.2f}x [{d['ci_low']:.2f}, {d['ci_high']:.2f}]"),
             })
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
     st.caption("A ratio above 1 means the planner found fewer diseases per joule at the "
                "higher T. Reported as measured: if the learned planner loses, this table "
                "shows it losing.")
