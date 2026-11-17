@@ -159,20 +159,26 @@ make install-dev
 make test
 ```
 
-`make test` runs the contract tests against the pinned pilot. If they fail on a fresh clone
-the dependency pin is wrong — fix that before writing anything else.
+`make test` runs the contract tests against the pinned pilot. If they fail on a fresh
+clone, the installed pilot is not the pinned `v1.0.0`.
 
 ## Usage
 
 The library is importable and holds no CLI. Runnable entry points live in `experiments/`.
 
-```python
-from scoutfield.perception import CNNClassifier
-from scoutfield.envs import FieldScoutEnv
-from scoutfield.planners import PPOPlanner, GreedyEntropyAgent  # the latter is the pilot's
+One episode, built exactly as the evaluation sweep builds one: the field and τ from
+`configs/ppo_field32.yaml`, observations drawn from the PlantDoc `shift_eval` logit pool
+in the artefact store, and `T` relative to the shift-fitted temperature.
 
-clf = CNNClassifier(checkpoint="checkpoints/perception/best.pt", temperature=4.0)
-env = FieldScoutEnv(field, clf, budget=640.0, global_map_size=8)
+```python
+from scoutfield.app import demo
+
+settings = demo.load_settings()                              # read from configs/
+pool = demo.load_pool(settings.pool_split)                   # stage 02 logit pool
+reference = demo.fitted_temperature(settings.reference_condition)   # shift-fitted
+run = demo.run_episode(demo.make_planner("greedy_entropy", seed=0), settings, pool,
+                       reference, temperature=4.0, seed=0)   # T = 4: underconfident
+print(run["info"]["detections_per_joule"], run["info"]["recall"])
 ```
 
 ```bash
@@ -181,6 +187,8 @@ python experiments/02_calibrate.py           --config configs/perception.yaml
 python experiments/03_train_ppo.py           --config configs/ppo_field32.yaml
 python experiments/04_sweep.py               --config configs/sweep.yaml
 python experiments/05_tau_sensitivity.py     --config configs/sweep.yaml
+python experiments/07_uncertainty.py train --member 1   # then 2, 3 and 4
+python experiments/07_uncertainty.py evaluate
 python experiments/make_figures.py
 ```
 
@@ -334,10 +342,10 @@ kaggle kernels push -p notebooks/01_perception_finetune   # local -> Kaggle, one
 
 ## Roadmap
 
-Ordered by dependency. Each item names how you know it is done. ✅ done, results in
-`docs/RESULTS.md` · ◐ partial · ☐ not started.
+The nine items of work, each with the criterion it was judged complete by. All nine are
+complete; their results are in `docs/RESULTS.md`.
 
-| # | Work | Done when | State |
+| # | Work | Judged complete when | State |
 | --- | --- | --- | --- |
 | 1 | Fine-tune EfficientNet-B0 on PlantVillage; hold out PlantDoc | accuracy and per-class ECE reported on both sets; checkpoint reproducible from a seed | ✅ |
 | 2 | `CNNClassifier` behind `observe()` | `make test` passes with the CNN swapped in; pilot baselines run unmodified | ✅ |
@@ -348,10 +356,6 @@ Ordered by dependency. Each item names how you know it is done. ✅ done, result
 | 7 | MC-dropout + deep ensembles; reliability diagrams | three uncertainty methods compared on one axis | ✅ |
 | 8 | Oracle planner; regret | every planner's gap to the ground-truth ceiling quantified | ✅ |
 | 9 | ONNX export, measured latency, deployed interface | latency measured on stated hardware, not estimated | ✅ demonstration live at <https://scoutfield.streamlit.app/> |
-
-**Standing risks.** Reward shaping can consume weeks — the reward is frozen and swept only
-if a result demands it. Simulator realism will be challenged in review, so every physical
-constant traces to a citation and every invented value gets swept.
 
 ---
 

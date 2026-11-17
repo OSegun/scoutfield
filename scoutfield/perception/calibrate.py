@@ -16,8 +16,9 @@ Three things happen here, in order
    instrument on a real classifier. The invariant below must hold on every sweep,
    and on ``shift_eval`` the signed error must change sign at T = 1.
 
-3. **MC-dropout and deep ensembles** as alternative uncertainty estimates
-   (roadmap item 7), evaluated on the same axis so the three are comparable.
+3. **MC-dropout and deep ensembles**: the functions stage 07 uses to compare them
+   with temperature scaling on the same axis (roadmap item 7,
+   ``scoutfield/perception/uncertainty.py``).
 
 The invariant, restated because it is the whole experiment
 ----------------------------------------------------------
@@ -197,9 +198,9 @@ def mc_dropout_logits(model, features, n_samples: int = 30, seed: int = 0) -> np
     ``nn.Dropout`` applies it in training mode (keep each feature with probability
     1 - p, scale the kept ones by 1 / (1 - p)), and the head's other layers run as
     in eval mode. Draws come from a generator seeded with ``seed``, so they
-    reproduce exactly. An earlier version called ``collect_logits`` for each draw,
-    which puts the model back in eval mode and so switched dropout off again: every
-    draw was the same. ``tests/test_uncertainty.py`` guards against that.
+    reproduce exactly. Calling ``collect_logits`` per draw would not work: it puts
+    the model in eval mode, which switches dropout off, so every draw would be the
+    same. ``tests/test_uncertainty.py`` asserts that the draws differ.
     """
     import copy
 

@@ -48,9 +48,9 @@ class FieldScoutEnv(ScoutEnv):
         not change if the field is scaled again later — a policy trained at one
         field size remains at least structurally loadable at another.
     include_global_map
-        Ablation switch. Roadmap item 5 needs the with/without comparison to
-        attribute any improvement to this change rather than to the scale change,
-        and the two are otherwise confounded.
+        Ablation switch. With it off, the observation omits the global map, so
+        the map's contribution can be separated from that of the larger field.
+        Run ``r2026-11-13`` kept it on throughout; no ablation is reported.
     """
 
     def __init__(self, *args, global_map_size: int = 8,

@@ -305,7 +305,7 @@ should not be trusted. Report the pool sizes alongside any such result; they are
 | τ (confirmation) | 0.75 | 0.75, **swept** | see the τ note below |
 | Observation | 5×5 patch + 3 scalars | **+ 8×8 global belief map** | an agent that cannot see past its neighbourhood cannot plan a route to a distant high-belief region; it can only hill-climb. Fixed 8×8 so obs dimension does not grow with field size. Downsample by **mean** pooling, not max — max lets one confident cell dominate a region and hides the uncertainty structure the planner exists to exploit. Pad with the prior, not zeros: zero asserts "certainly healthy", a claim with no evidence. |
 | Energy | `hover 1.0`, `translate 0.6` | unchanged | changing them would break comparability with the pilot |
-| Reward | `α=1.0, λ=6.0, μ=0.15` | unchanged | information gain + detection bonus − energy cost. **Freeze this.** Reward shaping consuming weeks is the project's top identified risk. |
+| Reward | `α=1.0, λ=6.0, μ=0.15` | unchanged | information gain + detection bonus − energy cost. Inherited from the pilot and held fixed for the whole run, so no result depends on reward tuning. |
 | Disease field | Neyman–Scott cluster process | unchanged | field epidemiology reports aggregated, not uniform, patterns (Heck et al., 2021). `sigma` is the aggregation dial, and aggregation is *measured* via the Morisita index rather than asserted. |
 | `n_parents` | 3 | **18** | holds prevalence constant across the scale change — see below |
 | `offspring_mean` | 14 | 14 | unchanged |

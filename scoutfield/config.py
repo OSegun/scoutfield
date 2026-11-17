@@ -53,6 +53,3 @@ def load_config(path: str | Path) -> Config:
         raise TypeError(f"config {p} did not parse to a mapping, got {type(data).__name__}")
     return Config(data=data, path=p)
 
-
-# TODO(implementation): add a `--set key.subkey=value` CLI override that records
-# the override in the run's summary, so an ad-hoc run is still reproducible.

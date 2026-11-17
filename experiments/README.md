@@ -31,6 +31,7 @@ Inputs and outputs are files in the artefact store (`configs/artifacts.yaml`), b
 
 ```
 00 → 01 → 02 → 03 → 04 → 05 → make_figures
+            02 → 07 → make_figures --only 16
 ```
 
 `make_figures.py` reads generated results files and nothing else. Never regenerate a
@@ -39,8 +40,8 @@ plausible-looking output that disagrees with the data, and nobody notices.
 
 ## Resumability
 
-`01`, `03`, `04` and `05` push their resume state to the store as they go and pull it
-back on start, so re-running the same command on any machine carries on from where the
+`01`, `03`, `04`, `05` and `07` push their resume state to the store as they go and pull
+it back on start, so re-running the same command on any machine carries on from where the
 store says the run is. Run `04` in bounded chunks:
 
 ```bash

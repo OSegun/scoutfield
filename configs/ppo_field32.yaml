@@ -30,8 +30,8 @@ env:
   # the value is measured rather than derived.
   n_parents: 18
   offspring_mean: 14
-  # Reward weights inherited from the pilot. Freeze these early: reward shaping is
-  # the identified risk most likely to consume weeks.
+  # Reward weights inherited from the pilot and held fixed for the whole run, so no
+  # result depends on reward tuning.
   alpha: 1.0
   lam: 6.0
   mu: 0.15

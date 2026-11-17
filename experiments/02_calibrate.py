@@ -1,5 +1,5 @@
 ﻿"""
-Roadmap items 2, 3 and 7: calibration.
+Roadmap items 2 and 3: calibration.
 
     python experiments/02_calibrate.py --config configs/perception.yaml
 

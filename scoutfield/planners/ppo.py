@@ -176,10 +176,9 @@ def train_ppo(config, seed: int | None = None, classifier=None,
     claim reviewers challenge first, so the flatness check is computed and
     recorded rather than asserted in prose.
 
-    The reward weights are read from the config and never tuned here. Reward
-    shaping consuming weeks is the project's top identified risk; if a shaping
-    change becomes necessary it gets swept and reported, not adjusted until the
-    numbers look better.
+    The reward weights are read from the config and never tuned here: they are
+    the pilot's, held fixed for the whole run, so no result depends on reward
+    tuning.
     """
     from stable_baselines3 import PPO
     from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv

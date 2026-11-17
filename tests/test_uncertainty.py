@@ -2,8 +2,8 @@
 Roadmap item 7: the uncertainty-method comparison.
 
 The comparison is only as good as its two least obvious parts: that MC-dropout
-draws really differ (an earlier version switched dropout off before every draw, so
-all thirty were one prediction), and that every ensemble member trains on the
+draws really differ (with dropout switched off, all thirty would be one
+prediction), and that every ensemble member trains on the
 stage 01 split with its own seed. These tests pin both, and the scoring, with an
 untrained network and synthetic logits: no datasets, no downloaded weights, no GPU.
 """

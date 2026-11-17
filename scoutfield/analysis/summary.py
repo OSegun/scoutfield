@@ -68,9 +68,9 @@ def read_rows(csv_path: str | Path) -> list[dict]:
             try:
                 row[key] = float(value)
             except ValueError as exc:
-                # Adding a label column to the sweep CSV used to fail here, deep in
-                # aggregation and long after the sweep had finished — the jobs were
-                # intact but the summary was never written. Say what to do instead.
+                # A label column added to the sweep CSV would otherwise fail deep in
+                # aggregation, long after the sweep had finished, with the jobs
+                # intact but no summary written. Say what to do instead.
                 raise ValueError(
                     f"column '{key}' holds the non-numeric value {value!r}. If it is a "
                     f"label rather than a measurement, add it to TEXT_COLUMNS in "
